@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Constants
 SKLAND_AUTH_URL="https://as.hypergryph.com/user/oauth2/v2/grant"

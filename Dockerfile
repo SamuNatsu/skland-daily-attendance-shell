@@ -2,7 +2,7 @@
 FROM alpine:latest
 
 # Install dependencies
-RUN apk update && apk add --no-cache curl jq openssl
+RUN apk add --no-cache bash curl jq openssl
 
 # Copy file
 COPY attendance.sh .
