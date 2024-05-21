@@ -14,4 +14,4 @@ RUN chmod +x entrypoint.sh
 RUN echo "0       0       *       *       *       /attendance.sh 1>> /var/log/stdout.log 2>> /var/log/stderr.log" >> /etc/crontabs/root
 
 # Start command
-CMD entrypoint.sh
+CMD /entrypoint.sh
