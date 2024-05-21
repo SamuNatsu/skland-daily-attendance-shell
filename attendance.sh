@@ -6,8 +6,8 @@ CRED_CODE_URL="https://zonai.skland.com/api/v1/user/auth/generate_cred_by_code"
 BINDING_URL="https://zonai.skland.com/api/v1/game/player/binding"
 SKLAND_CHECKIN_URL="https://zonai.skland.com/api/v1/score/checkin"
 SKLAND_ATTENDANCE_URL="https://zonai.skland.com/api/v1/game/attendance"
-SKLAND_BOARD_IDS="1,2,3,4,100"
-SKLAND_BOARD_NAMES='{"1":"明日方舟","2":"来自星辰","3":"明日方舟: 终末地","4":"泡姆泡姆","100":"纳斯特港"}'
+SKLAND_BOARD_IDS="1,2,3,4,100,101"
+SKLAND_BOARD_NAMES='{"1":"明日方舟","2":"来自星辰","3":"明日方舟: 终末地","4":"泡姆泡姆","100":"纳斯特港","101":"开拓芯"}'
 
 ## Generate signature
 # $1 -> token
@@ -241,16 +241,25 @@ skland_attendance() {
 do_attendance() {
   # Get auth code
   local CODE=$(hypergryph_auth $1)
+  if [[ -z $CODE ]]; then
+    exit 1
+  fi
   echo "OAuth 登陆成功"
 
   # Get cred and token
   local TMP=$(skland_sign_in $CODE)
+  if [[ -z $TMP ]]; then
+    exit 1
+  fi
   local CRED=$(jq -r ".cred" <<< $TMP)
   local TOKEN=$(jq -r ".token" <<< $TMP)
   echo "森空岛登陆成功"
 
   # Get binding list
   local LIST=$(skland_get_binding $CRED $TOKEN)
+  if [[ -z $LIST ]]; then
+    exit 1
+  fi
   echo "角色绑定获取成功"
 
   # Skland check in
