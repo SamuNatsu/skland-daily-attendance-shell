@@ -11,7 +11,7 @@ RUN chmod +x attendance.sh
 RUN chmod +x entrypoint.sh
 
 # Add task
-RUN echo "0       0       *       *       *       /attendance.sh 1>> /var/log/stdout.log 2>> /var/log/stderr.log" >> /etc/cron/crontab
+RUN echo "0       0       *       *       *       /attendance.sh 1>> /var/log/stdout.log 2>> /var/log/stderr.log" >> /etc/crontabs/root
 
 # Start command
 CMD entrypoint.sh
