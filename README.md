@@ -2,8 +2,7 @@
 
 一个纯 Shell 实现的 森空岛每日签到，仅使用 CURL、OpenSSL 和 jq 这三个第三方程序。
 
-代码移植自 [skland-daily-attendance](https://github.com/enpitsuLin/skland-daily-attendance)。  
-暂时没有实现推送服务，如有需要请 ISSUE 我或发一个 PR。
+代码移植自 [skland-daily-attendance](https://github.com/enpitsuLin/skland-daily-attendance)。
 
 虽然是 Docker 镜像，但是你也可以直接就把仓库里的 `attendance.sh` 拿去用而不使用 Docker。
 
@@ -19,4 +18,9 @@ Docker 镜像在 <https://hub.docker.com/r/snrainiar/docker-skland-daily>
 
 与直接使用类似，你需要设置环境变量 `SKLAND_TOKEN`，然后启动镜像即可。
 
-与直接使用不同，该 Docker 镜像配置了计划任务，会在每天的 00:00 自动执行一次签到。
+该 Docker 镜像配置了计划任务，会在每天的 00:00 自动执行一次签到。
+
+## 消息推送
+
+* 支持 server 酱推送每日签到信息，你需要环境变量 `SERVERCHAN_KEY`，填入你 server 酱的推送密钥
+* 支持 bark 推送每日签到信息，你需要环境变量 `BARK_URL`，填入你 bark 的推送地址

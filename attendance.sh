@@ -1,303 +1,442 @@
 #!/bin/bash
 
-# Constants
-SKLAND_AUTH_URL="https://as.hypergryph.com/user/oauth2/v2/grant"
-CRED_CODE_URL="https://zonai.skland.com/api/v1/user/auth/generate_cred_by_code"
-BINDING_URL="https://zonai.skland.com/api/v1/game/player/binding"
-SKLAND_CHECKIN_URL="https://zonai.skland.com/api/v1/score/checkin"
-SKLAND_ATTENDANCE_URL="https://zonai.skland.com/api/v1/game/attendance"
-SKLAND_BOARD_IDS="1,2,3,4,100,101"
-SKLAND_BOARD_NAMES='{"1":"明日方舟","2":"来自星辰","3":"明日方舟: 终末地","4":"泡姆泡姆","100":"纳斯特港","101":"开拓芯"}'
+#------------------------------------------------------------------------------
+# 常量
+#------------------------------------------------------------------------------
 
-## Generate signature
-# $1 -> token
-# $2 -> pathname
-# $3 -> searchParams
-# $4 -> data
+HYPERGRYPH_OAUTH_URL='https://as.hypergryph.com/user/oauth2/v2/grant'
+SKLAND_AUTH_URL='https://zonai.skland.com/api/v1/user/auth/generate_cred_by_code'
+SKLAND_BINDING_URL='https://zonai.skland.com/api/v1/game/player/binding'
+SKLAND_CHECKIN_URL='https://zonai.skland.com/api/v1/score/checkin'
+SKLAND_ATTENDANCE_URL='https://zonai.skland.com/api/v1/game/attendance'
+
+declare -A SKLAND_BOARD_MAP
+SKLAND_BOARD_MAP[1]='明日方舟'
+SKLAND_BOARD_MAP[2]='来自星辰'
+SKLAND_BOARD_MAP[3]='明日方舟: 终末地'
+SKLAND_BOARD_MAP[4]='泡姆泡姆'
+SKLAND_BOARD_MAP[100]='纳斯特港'
+SKLAND_BOARD_MAP[101]='开拓芯'
+
+#------------------------------------------------------------------------------
+# 日志函数
+#------------------------------------------------------------------------------
+
+# (str)
+info() {
+  local timestamp=$(date +"%Y-%m-%dT%H:%M:%S%z")
+  echo "[$timestamp] [ INFO] $1" > /dev/stdout
+}
+
+# (str)
+debug() {
+  local timestamp=$(date +"%Y-%m-%dT%H:%M:%S%z")
+  echo "[$timestamp] [DEBUG] $1" > /dev/stderr
+}
+
+# (str)
+error() {
+  local timestamp=$(date +"%Y-%m-%dT%H:%M:%S%z")
+  echo "[$timestamp] [ERROR] $1" > /dev/stderr
+}
+
+#------------------------------------------------------------------------------
+# 工具函数
+#------------------------------------------------------------------------------
+
+# 生成 API 签名
+# (token, path, query, data) -> signature, header
 generate_signature() {
-  # Sign header
-  local PLATFORM="1"
-  local TIMESTAMP=$(($(date +%s) - 2))
-  local DID=""
-  local VNAME="1.5.1"
+  # 初始化 header
+  local platform='1'
+  local timestamp=$(($(date +%s) - 2))
+  local dId=''
+  local vName='1.5.1'
+  local header='{"platform":"'$platform'","timestamp":"'$timestamp'","dId":"'$dId'","vName":"'$vName'"}'
 
-  # Signing
-  local STR="$2$3$4$TIMESTAMP{\"platform\":\"$PLATFORM\",\"timestamp\":\"$TIMESTAMP\",\"dId\":\"$DID\",\"vName\":\"$VNAME\"}"
-  local HMAC=$(echo -n $STR | openssl dgst -sha256 -hmac $1 | awk '{print $2}')
-  local SIGN=$(echo -n $HMAC | md5sum | awk '{print $1}')
+  # 生成签名
+  local str=$2$3$4$timestamp$header
+  local hmac_sha256=$(echo -n $str | openssl dgst -sha256 -hmac $1 | awk '{print $2}')
+  local sign=$(echo -n $hmac_sha256 | md5sum | awk '{print $1}')
 
-  # Return signature and headers
-  echo $SIGN
-  echo $PLATFORM
-  echo $TIMESTAMP
-  echo $DID
-  echo $VNAME
+  # 返回签名和 header
+  echo $sign
+  echo $header
 }
 
-## Get privacy name
-# $1 -> name
+# 名字打码
+# (name) -> privacy_name
 get_privacy_name() {
-  local NAME=$1
-  local FIRST=${NAME:0:1}
-  local LAST=${NAME: -1}
-  echo "$FIRST****$LAST"
+  local privacy=$(sed 's/./*/g' <<< ${1:1:-1})
+  echo ${1:0:1}$privacy${1: -1}
 }
 
-## Hypergryph auth
-# $1 -> token
-hypergryph_auth() {
-  # Query API
-  local RESPONSE=$(
-    curl \
-    -s \
-    -H "User-Agent: Skland/1.5.1 (com.hypergryph.skland; build:100501001; Android 34; ) Okhttp/4.11.0" \
-    -H "Accept-Encoding: gzip" \
-    -H "Connection: close" \
-    -H "Content-Type: application/json" \
-    -d "{\"appCode\":\"4ca99fa6b56cc2ba\",\"token\":\"$1\",\"type\":0}" \
-    $SKLAND_AUTH_URL
-  )
-  if [ $? -ne 0 ]; then
-    echo "[失败] 无法访问 OAuth API" >&2
-    exit 1
-  fi
+#------------------------------------------------------------------------------
+# 通知推送 API
+#------------------------------------------------------------------------------
 
-  # Check response
-  if [[ $(jq 'has("data")' <<< $RESPONSE) == "false" ]]; then
-    local MSG=$(jq -r ".msg" <<< $RESPONSE)
-    echo "[失败] 无法登陆: $MSG" >&2
-    exit 1
-  fi
-
-  # Return code
-  echo $(jq -r ".data.code" <<< $RESPONSE)
+# 初始化
+notification_init() {
+  local timestamp=$(date +"%Y-%m-%d %H:%M:%S %Z")
+  echo -ne "# 森空岛每日签到\n\n> $timestamp" > /tmp/skland-daily.log
 }
 
-## Skland sign in
-# $1 -> code
-skland_sign_in() {
-  # Query API
-  local RESPONSE=$(
+# 添加推送内容记录
+# (str)
+notification_add() {
+  echo -ne "\n\n$1" >> /tmp/skland-daily.log
+}
+
+# Bark 推送 API
+# (url, title, content)
+notification_bark() {
+  # 发送请求
+  local response=$(
     curl \
       -s \
-      -H "User-Agent: Skland/1.5.1 (com.hypergryph.skland; build:100501001; Android 34; ) Okhttp/4.11.0" \
-      -H "Accept-Encoding: gzip" \
-      -H "Connection: close" \
-      -H "Content-Type: application/json; charset=utf-8" \
-      -d "{\"code\":\"$1\",\"kind\":1}" \
-      $CRED_CODE_URL
+      -H 'Content-Type: application/json; charset=utf-8' \
+      -d '{"title":"'$2'","body":"'$3'","group":"Skland"}' \
+      $1
   )
+
+  # 检查 CURL 返回值
   if [ $? -ne 0 ]; then
-    echo "[失败] 无法访问森空岛登陆 API" >&2
-    exit 1
+    error "无法访问 Bark API: curl_exit=$?"
+    return 1
   fi
 
-  # Check response
-  if [[ $(jq ".code != 0" <<< $RESPONSE) == "true" ]]; then
-    local MSG=$(jq -r ".message" <<< $RESPONSE)
-    echo "[失败] 无法登陆森空岛: $MSG" >&2
-    exit 1
-  fi
-
-  # Return response
-  echo $(jq ".data" <<< $RESPONSE)
+  # 打印响应
+  debug "Bark 响应: json=$response"
 }
 
-## Skland get binding
-# $1 -> cred
-# $2 -> token
+# Server 酱推送 API
+# (key, title, content)
+notification_server_chan() {
+  # 发送请求
+  local response=$(
+    curl \
+      -s \
+      -H 'Content-Type: application/json; charset=utf-8' \
+      -d '{"title":"'$2'","desp":"'$3'"}' \
+      "https://sctapi.ftqq.com/$1.send"
+  )
+
+  # 检查 CURL 返回值
+  if [ $? -ne 0 ]; then
+    error "无法访问 Server 酱 API: curl_exit=$?"
+    return 1
+  fi
+
+  # 检查响应
+  if [[ $(jq '.code == 0' <<< $response) == 'true' ]]; then
+    info 'Server 酱推送成功'
+  else
+    error "Server 酱推送失败: response=$response"
+    return 1
+  fi
+}
+
+# 执行推送
+notification_execute() {
+  # 获取记录
+  local content=$(cat /tmp/skland-daily.log)
+  rm -f /tmp/skland-daily.log
+
+  # Bark 推送
+  if [[ -n $BARK_URL ]]; then
+    notification_bark $BARK_URL '【森空岛每日签到】' "$content"
+  fi
+
+  # Server 酱推送
+  if [[ -n $SERVERCHAN_KEY ]]; then
+    notification_server_chan $SERVERCHAN_KEY '【森空岛每日签到】' "$content"
+  fi
+}
+
+#------------------------------------------------------------------------------
+# 鹰角网络通行证 API
+#------------------------------------------------------------------------------
+
+# OAuth 登陆
+# (token) -> code
+hypergryph_auth() {
+  # 发送请求
+  local response=$(
+    curl \
+      -s \
+      -H 'User-Agent: Skland/1.5.1 (com.hypergryph.skland; build:100501001; Android 34; ) Okhttp/4.11.0' \
+      -H 'Accept-Encoding: gzip' \
+      -H 'Connection: close' \
+      -H 'Content-Type: application/json; charset=utf-8' \
+      -d '{"appCode":"4ca99fa6b56cc2ba","token":"'$1'","type":0}' \
+      $HYPERGRYPH_OAUTH_URL
+  )
+
+  # 检查 CURL 返回值
+  if [ $? -ne 0 ]; then
+    error "无法访问 OAuth API: curl_exit=$?"
+    return 1
+  fi
+
+  # 检查响应
+  if [[ $(jq '.status != 0' <<< $response) == 'true' ]]; then
+    local msg=$(jq -r '.msg' <<< $response)
+    error "无法登陆鹰角网络通行证: msg=$msg"
+    return 1
+  fi
+
+  # 返回 code
+  echo $(jq -r '.data.code' <<< $response)
+}
+
+#------------------------------------------------------------------------------
+# 森空岛 API
+#------------------------------------------------------------------------------
+
+# 鉴权
+# (code) -> cred, token
+skland_auth() {
+  # 发送请求
+  local response=$(
+    curl \
+      -s \
+      -H 'User-Agent: Skland/1.5.1 (com.hypergryph.skland; build:100501001; Android 34; ) Okhttp/4.11.0' \
+      -H 'Accept-Encoding: gzip' \
+      -H 'Connection: close' \
+      -H 'Content-Type: application/json; charset=utf-8' \
+      -d '{"code":"'$1'","kind":1}' \
+      $SKLAND_AUTH_URL
+  )
+
+  # 检查 CURL 返回值
+  if [ $? -ne 0 ]; then
+    error "无法访问鉴权 API: curl_exit=$?"
+    return 1
+  fi
+
+  # 检查响应
+  if [[ $(jq '.code != 0' <<< $response) == 'true' ]]; then
+    local msg=$(jq -r '.message' <<< $response)
+    error "无法鉴权: message=$msg"
+    return 1
+  fi
+
+  # 返回 cred 和 token
+  echo $(jq -r '.data.cred' <<< $response)
+  echo $(jq -r '.data.token' <<< $response)
+}
+
+# 获得角色绑定信息
+# (cred, token) -> list
 skland_get_binding() {
-  # Get signature and header
-  local SIGN=$(generate_signature $2 "/api/v1/game/player/binding" "" "")
-  local PLATFORM=$(awk "NR==2" <<< $SIGN)
-  local TIMESTAMP=$(awk "NR==3" <<< $SIGN)
-  local DID=$(awk "NR==4" <<< $SIGN)
-  local VNAME=$(awk "NR==5" <<< $SIGN)
-  SIGN=$(awk "NR==1" <<< $SIGN)
+  # 获得签名和 header
+  local tmp=$(generate_signature $2 '/api/v1/game/player/binding')
+  local sign=$(awk 'NR==1' <<< $tmp)
+  local header=$(awk 'NR==2' <<< $tmp)
 
-  # Query API
-  local RESPONSE=$(
+  # 发送请求
+  local response=$(
     curl \
-    -s \
-    -H "Platform: $PLATFORM" \
-    -H "Timestamp: $TIMESTAMP" \
-    -H "Did: $DID" \
-    -H "Vname: $VNAME" \
-    -H "Sign: $SIGN" \
-    -H "Cred: $1" \
-    $BINDING_URL
+      -s \
+      -H 'User-Agent: Skland/1.5.1 (com.hypergryph.skland; build:100501001; Android 34; ) Okhttp/4.11.0' \
+      -H 'Accept-Encoding: gzip' \
+      -H 'Connection: close' \
+      -H 'Content-Type: application/json; charset=utf-8' \
+      -H "Platform: $(jq -r '.platform' <<< $header)" \
+      -H "Timestamp: $(jq -r '.timestamp' <<< $header)" \
+      -H "Did: $(jq -r '.dId' <<< $header)" \
+      -H "Vname: $(jq -r '.vName' <<< $header)" \
+      -H "Sign: $sign" \
+      -H "Cred: $1" \
+      $SKLAND_BINDING_URL
   )
+
+  # 检查 CURL 返回值
   if [ $? -ne 0 ]; then
-    echo "[错误] 无法访问森空岛角色绑定 API" >&2
-    exit 1
+    error "无法访问角色绑定 API: curl_exit=$?"
+    return 1
   fi
 
-  # Check response
-  if [[ $(jq ".code != 0" <<< $RESPONSE) == "true" ]]; then
-    local MSG=$(jq -r ".message" <<< $RESPONSE)
-    echo "[错误] 无法获取角色绑定: $MSG" >&2
-    exit 1
+  # 检查响应
+  if [[ $(jq '.code != 0' <<< $response) == 'true' ]]; then
+    local msg=$(jq -r '.message' <<< $response)
+    error "无法获取角色绑定: message=$msg"
+    return 1
   fi
 
-  # Return response
-  echo $(jq ".data.list" <<< $RESPONSE)
+  # 返回角色绑定表
+  echo $(jq -c '.data.list | map(.bindingList) | flatten(1)' <<< $response)
 }
 
-## Skland check in
-# $1 -> cred
-# $2 -> token
-# $3 -> board
+# 森空岛检票
+# (cred, token, id)
 skland_check_in() {
-  # Get signature and header
-  local SIGN=$(generate_signature $2 "/api/v1/score/checkin" "" "{\"gameId\":\"$3\"}")
-  local PLATFORM=$(awk "NR==2" <<< $SIGN)
-  local TIMESTAMP=$(awk "NR==3" <<< $SIGN)
-  local DID=$(awk "NR==4" <<< $SIGN)
-  local VNAME=$(awk "NR==5" <<< $SIGN)
-  SIGN=$(awk "NR==1" <<< $SIGN)
+  # 获得签名和 header
+  local tmp=$(generate_signature $2 '/api/v1/score/checkin' '' '{"gameId":'$3'}')
+  local sign=$(awk 'NR==1' <<< $tmp)
+  local header=$(awk 'NR==2' <<< $tmp)
 
-  # Query API
-  local RESPONSE=$(
+  # 发送请求
+  local response=$(
     curl \
-    -s \
-    -H "Platform: $PLATFORM" \
-    -H "Timestamp: $TIMESTAMP" \
-    -H "Did: $DID" \
-    -H "Vname: $VNAME" \
-    -H "Sign: $SIGN" \
-    -H "Cred: $1" \
-    -H "Content-Type: application/json; chaset=utf-8" \
-    -H "User-Agent: Skland/1.5.1 (com.hypergryph.skland; build:100501001; Android 34; ) Okhttp/4.11.0" \
-    -H "Accept-Encoding: gzip" \
-    -H "Connection: close" \
-    -d "{\"gameId\":\"$3\"}" \
-    $SKLAND_CHECKIN_URL
+      -s \
+      -H 'User-Agent: Skland/1.5.1 (com.hypergryph.skland; build:100501001; Android 34; ) Okhttp/4.11.0' \
+      -H 'Accept-Encoding: gzip' \
+      -H 'Connection: close' \
+      -H 'Content-Type: application/json; charset=utf-8' \
+      -H "Platform: $(jq -r '.platform' <<< $header)" \
+      -H "Timestamp: $(jq -r '.timestamp' <<< $header)" \
+      -H "Did: $(jq -r '.dId' <<< $header)" \
+      -H "Vname: $(jq -r '.vName' <<< $header)" \
+      -H "Sign: $sign" \
+      -H "Cred: $1" \
+      -d '{"gameId":'$3'}' \
+      $SKLAND_CHECKIN_URL
   )
+
+  # 检查 CURL 返回值
   if [ $? -ne 0 ]; then
-    echo "[错误] 无法访问森空岛检票 API" >&2
-    exit 1
+    error "无法访问检票 API: curl_exit=$?"
+    return 1
   fi
 
-  # Check response
-  local BOARD=$(jq -r ".[\"$3\"]" <<< $SKLAND_BOARD_NAMES)
-  if [[ $(jq ".code == 0" <<< $RESPONSE) == "true" ]]; then
-    echo "版面 [$BOARD] 检票成功"
+  # 检查响应
+  local board=${SKLAND_BOARD_MAP[$3]}
+  if [[ $(jq '.code == 0' <<< $response) == 'true' ]]; then
+    notification_add "版面【$board】检票成功"
+    info "版面【$board】检票成功"
   else
-    local MSG=$(jq -r ".message" <<< $RESPONSE)
-    echo "版面 [$BOARD] 检票失败: $MSG" >&2
+    local msg=$(jq -r '.message' <<< $response)
+    notification_add "版面【$board】检票成功，错误信息：$msg"
+    error "版面【$board】检票失败: message=$msg"
+    return 1
   fi
 }
 
-## Arknights daily
-# $1 -> cred
-# $2 -> token
-# $3 -> uid
-# $4 -> cmid
-# $5 -> channel name
-# %6 -> privacy name
+# 明日方舟签到
+# (cred, token, item)
 skland_attendance() {
-  # Get signature and header
-  local SIGN=$(generate_signature $2 "/api/v1/game/attendance" "" "{\"uid\":\"$3\",\"gameId\":\"$4\"}")
-  local PLATFORM=$(awk "NR==2" <<< $SIGN)
-  local TIMESTAMP=$(awk "NR==3" <<< $SIGN)
-  local DID=$(awk "NR==4" <<< $SIGN)
-  local VNAME=$(awk "NR==5" <<< $SIGN)
-  SIGN=$(awk "NR==1" <<< $SIGN)
+  # 提取角色数据
+  local uid=$(jq -r '.uid' <<< $3)
+  local cid=$(jq -r '.channelMasterId' <<< $3)
+  local cname=$(jq -r '.channelName' <<< $3)
+  local nname=$(jq -r '.nickName' <<< $3)
+  local pname=$(get_privacy_name $nname)
 
-  # Query API
-  local RESPONSE=$(
+  # 获得签名和 header
+  local tmp=$(generate_signature $2 '/api/v1/game/attendance' '' '{"uid":"'$uid'","gameId":"'$cid'"}')
+  local sign=$(awk 'NR==1' <<< $tmp)
+  local header=$(awk 'NR==2' <<< $tmp)
+
+  # 发送请求
+  local response=$(
     curl \
-    -s \
-    -H "Platform: $PLATFORM" \
-    -H "Timestamp: $TIMESTAMP" \
-    -H "Did: $DID" \
-    -H "Vname: $VNAME" \
-    -H "Sign: $SIGN" \
-    -H "Cred: $1" \
-    -H "Content-Type: application/json; chaset=utf-8" \
-    -H "User-Agent: Skland/1.5.1 (com.hypergryph.skland; build:100501001; Android 34; ) Okhttp/4.11.0" \
-    -H "Accept-Encoding: gzip" \
-    -H "Connection: close" \
-    -d "{\"uid\":\"$3\",\"gameId\":\"$4\"}" \
-    $SKLAND_ATTENDANCE_URL
+      -s \
+      -H 'User-Agent: Skland/1.5.1 (com.hypergryph.skland; build:100501001; Android 34; ) Okhttp/4.11.0' \
+      -H 'Accept-Encoding: gzip' \
+      -H 'Connection: close' \
+      -H 'Content-Type: application/json; charset=utf-8' \
+      -H "Platform: $(jq -r '.platform' <<< $header)" \
+      -H "Timestamp: $(jq -r '.timestamp' <<< $header)" \
+      -H "Did: $(jq -r '.dId' <<< $header)" \
+      -H "Vname: $(jq -r '.vName' <<< $header)" \
+      -H "Sign: $sign" \
+      -H "Cred: $1" \
+      -d '{"uid":"'$uid'","gameId":"'$cid'"}' \
+      $SKLAND_ATTENDANCE_URL
   )
+
+  # 检查 CURL 返回值
   if [ $? -ne 0 ]; then
-    echo "[错误] 无法访问森空岛签到 API" >&2
-    exit 1
+    error "无法访问签到 API: curl_exit=$?"
+    return 1
   fi
 
-  # Check response
-  if [[ $(jq ".code == 0" <<< $RESPONSE) == "true" ]]; then
-    local AWARDS=$(jq ".data.awards" <<< $RESPONSE)
-    echo $5"角色 $6 签到成功，获得了：$AWARDS"
+  # 检查响应
+  if [[ $(jq '.code == 0' <<< $response) == 'true' ]]; then
+    local awards=$(jq '.data.awards | map([.resource.name, .count]) | map(join(" x")) | join(", ")' <<< $response)
+    notification_add "$cname - $pname 签到成功，获得了：$awards"
+    info "$cname - $pname 签到成功，获得了：$awards"
   else
-    local MSG=$(jq -r ".message" <<< $RESPONSE)
-    echo $5"角色 $6 签到失败：$MSG" >&2
+    local msg=$(jq -r '.message' <<< $response)
+    notification_add "$cname - $pname 签到失败，错误信息：$msg"
+    error "$cname - $pname 签到失败: message=$msg"
+    return 1
   fi
 }
 
-## Do attendance
-# $1 -> token
+#------------------------------------------------------------------------------
+# 签到流程函数
+#------------------------------------------------------------------------------
+
+# 进行签到
+# (token)
 do_attendance() {
-  # Get auth code
-  local CODE=$(hypergryph_auth $1)
-  if [[ -z $CODE ]]; then
-    exit 1
-  fi
-  echo "OAuth 登陆成功"
+  # 初始化推送
+  notification_init
 
-  # Get cred and token
-  local TMP=$(skland_sign_in $CODE)
-  if [[ -z $TMP ]]; then
-    exit 1
+  # OAuth 登陆
+  local code=$(hypergryph_auth $1)
+  if [[ -z $code ]]; then
+    return 1
   fi
-  local CRED=$(jq -r ".cred" <<< $TMP)
-  local TOKEN=$(jq -r ".token" <<< $TMP)
-  echo "森空岛登陆成功"
+  info 'OAuth 登陆成功'
 
-  # Get binding list
-  local LIST=$(skland_get_binding $CRED $TOKEN)
-  if [[ -z $LIST ]]; then
-    exit 1
+  # 森空岛鉴权
+  local tmp=$(skland_auth $code)
+  if [[ -z $tmp ]]; then
+    return 1
   fi
-  echo "角色绑定获取成功"
+  local cred=$(awk 'NR==1' <<< $tmp)
+  local token=$(awk 'NR==2' <<< $tmp)
+  info '森空岛鉴权成功'
 
-  # Skland check in
-  local IDS=""
-  IFS="," read -ra IDS <<< $SKLAND_BOARD_IDS
-  for ID in ${IDS[@]}; do
-    skland_check_in $CRED $TOKEN $ID &
+  # 获取角色绑定
+  local list=$(skland_get_binding $cred $token)
+  if [[ -z $list ]]; then
+    return 1
+  fi
+  info '角色绑定获取成功'
+
+  # 森空岛检票
+  notification_add '## 森空岛各版面每日检票'
+  for id in ${!SKLAND_BOARD_MAP[*]}; do
+    skland_check_in $cred $token $id &
   done
   wait
+  info '森空岛检票完毕'
 
-  # Arknights attendance
-  LIST=$(jq "map(.bindingList) | flatten(1)" <<< $LIST)
-  local LEN=$(jq "length" <<< $LIST)
-  local I=0
-  while [ $I -lt $LEN ]; do
-    local AUID=$(jq -r ".[$I].uid" <<< $LIST)
-    local CMID=$(jq -r ".[$I].channelMasterId" <<< $LIST)
-    local CHANNEL=$(jq -r ".[$I].channelName" <<< $LIST)
-    local NAME=$(jq -r ".[$I].nickName" <<< $LIST)
-    skland_attendance $CRED $TOKEN $AUID $CMID $CHANNEL $(get_privacy_name $NAME) &
-    I=$(($I + 1))
+  # 明日方舟签到
+  notification_add '## 明日方舟签到'
+  local list_len=$(jq 'length' <<< $list)
+  local i=0
+  while [ $i -lt $list_len ]; do
+    local item=$(jq -c ".[$i]" <<< $list)
+    skland_attendance $cred $token $item &
+    i=$(($i + 1))
   done
   wait
+  info '明日方舟签到完毕'
+
+  # 推送通知
+  notification_execute
 }
 
-### Main entry
+#------------------------------------------------------------------------------
+# 主入口
+#------------------------------------------------------------------------------
 
-# Parse environment
+# 检查环境变量
 if [[ -z "$SKLAND_TOKEN" ]]; then
-  echo '[错误] 环境变量 "SKLAND_TOKEN" 未定义' >&2
+  error '环境变量 "SKLAND_TOKEN" 未定义'
   exit 1
 fi
-IFS="," read -ra ACCOUNTS <<< $SKLAND_TOKEN
 
-# Execute tasks
-I=1
-for ACCOUNT in ${ACCOUNTS[@]}; do
-  echo "正在处理账号 #$I"
-  do_attendance $ACCOUNT
-  I=$(($I + 1))
+# 执行多账号签到任务
+IFS="," read -ra tokens <<< $SKLAND_TOKEN
+i=1
+for token in ${tokens[*]}; do
+  info "正在处理账号 #$i"
+  do_attendance $token
+  i=$(($i + 1))
 done
