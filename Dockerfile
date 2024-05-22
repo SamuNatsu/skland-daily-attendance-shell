@@ -1,8 +1,11 @@
 # Base image
 FROM alpine:latest
 
+# Set timezone
+ENV TZ=Asia/Shanghai
+
 # Install dependencies
-RUN apk add --no-cache bash curl jq openssl
+RUN apk add --no-cache bash curl jq openssl tzdata
 
 # Copy file
 COPY attendance.sh .
