@@ -1,6 +1,6 @@
 # 森空岛签到
 
-纯 Shell 实现的森空岛每日签到森空岛各版面登岛检票和明日方舟每日签到任务
+纯 Shell 实现的森空岛各版面登岛检票和明日方舟每日签到任务
 
 主要逻辑代码移植自 [skland-daily-attendance](https://github.com/enpitsuLin/skland-daily-attendance)
 
