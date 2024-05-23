@@ -49,14 +49,36 @@ services:
       SKLAND_TOKEN: xxxx,yyyy,zzzz
 ```
 
+### 白嫖 GitHub Actions 使用
+
+**强烈不推荐使用该方式，因为可能会触发 GitHub Actions 滥用检测导致仓库爆炸**
+
+1. Fork 一份仓库代码
+
+   点击仓库右上角的 `Fork` 按钮将仓库 Fork 到自己的账号下
+
+2. 添加仓库 Secret
+
+   点击 `Settings` -> 点击选项卡 `Secrets and variables` -> 点击 `Actions` -> 点击 `New repository secret`
+
+   建立名为 `SKLAND_TOKEN` 的 Secret，按照 [直接使用](#直接使用) 中的要求填写
+
+3. 启动 Action
+
+   Action 默认为关闭状态，Fork 之后需要手动执行一次，若成功运行其才会激活
+
+   点击 `Actions` -> 点击左侧 `Schedule` -> 点击 `Run workflow`
+
+***注意：如果仓库 60 天内没有活动，其计划 Actions 会被自动禁用，届时你需要手动重启一下（一般会发邮件通知你 Actions 禁用）***
+
 ## 通知推送功能
 
-**通知推送功能仅适用于 Docker 和 Docker compose 使用方法**
-
-### Server 酱推送
-
-你需要设置环境变量 `SERVERCHAN_KEY`，填入你 Server 酱的推送密钥
+**通知推送功能仅适用于 Docker 和 Docker compose**
 
 ### Bark 推送
 
 你需要设置环境变量 `BARK_URL`，填入你 Bark 的推送地址
+
+### Server 酱推送
+
+你需要设置环境变量 `SERVERCHAN_SENDKEY`，填入你 Server 酱的推送密钥

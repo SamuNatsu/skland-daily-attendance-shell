@@ -1,0 +1,20 @@
+name: Schedule
+
+on:
+  schedule:
+    - cron: '0 13 * * *'
+  workflow_dispatch:
+
+jobs:
+  attendance:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run script
+        run: export
+        env:
+          BARK_URL: ${{ secrets.BARK_URL }}
+          SERVERCHAN_SENDKEY: ${{ secrets.SERVERCHAN_SENDKEY }}
+          SKLAND_TOKEN: ${{ secrets.SKLAND_TOKEN }}

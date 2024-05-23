@@ -151,8 +151,8 @@ notification_execute() {
   fi
 
   # Server 酱推送
-  if [[ -n $SERVERCHAN_KEY ]]; then
-    notification_server_chan $SERVERCHAN_KEY '【森空岛每日签到】' "$content"
+  if [[ -n $SERVERCHAN_SENDKEY ]]; then
+    notification_server_chan $SERVERCHAN_SENDKEY '【森空岛每日签到】' "$content"
   fi
 }
 
