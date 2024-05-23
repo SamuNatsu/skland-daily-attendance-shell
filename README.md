@@ -27,12 +27,17 @@ SKLAND_TOKEN=xxxx,yyyy,zzzz ./attendance.sh
 
 Docker 镜像在 <https://hub.docker.com/r/snrainiar/skland-daily-attendance-shell>
 
-你需要根据 [直接使用](#直接使用) 中的步骤配置环境变量 `SKLAND_TOKEN`，然后启动镜像即可
+你需要根据 [直接使用](#直接使用) 中的步骤获得环境变量 `SKLAND_TOKEN` 的值，然后把它编写到 Docker 启动命令中启动镜像即可
 
 镜像中配置了计划任务，会在每天的 05:00(CST) 执行一次签到，因此你不需要手动重启镜像
 
 ```sh
-docker run -d --restart always --name skland-daily-attendance -e SKLAND_TOKEN=xxxx,yyyy,zzzz snrainiar/skland-daily-attendance-shell
+docker run \
+  -d \
+  --restart always \
+  --name skland-daily-attendance \
+  -e SKLAND_TOKEN=xxxx,yyyy,zzzz \
+  snrainiar/skland-daily-attendance-shell
 ```
 
 ### 在 Docker compose 中使用
@@ -67,18 +72,20 @@ services:
 
    Action 默认为关闭状态，Fork 之后需要手动执行一次，若成功运行其才会激活
 
-   点击 `Actions` -> 点击左侧 `Schedule` -> 点击 `Run workflow`
+   点击 `Actions` -> 点击左侧 `Schedule` -> 点击 `Run workflow` -> 点击按钮 `Run workflow`
 
 ***注意：如果仓库 60 天内没有活动，其计划 Actions 会被自动禁用，届时你需要手动重启一下（一般会发邮件通知你 Actions 禁用）***
 
 ## 通知推送功能
 
-**通知推送功能仅适用于 Docker 和 Docker compose**
-
 ### Bark 推送
 
 你需要设置环境变量 `BARK_URL`，填入你 Bark 的推送地址
 
+对于白嫖 GitHub Actions 用户，你需要像 [白嫖 GitHub Actions 使用](#白嫖-github-actions-使用) 中定义 `SKLAND_TOKEN` 一样在仓库 Secret 中定义 `BARK_URL`
+
 ### Server 酱推送
 
 你需要设置环境变量 `SERVERCHAN_SENDKEY`，填入你 Server 酱的推送密钥
+
+对于白嫖 GitHub Actions 用户，你需要像 [白嫖 GitHub Actions 使用](#白嫖-github-actions-使用) 中定义 `SKLAND_TOKEN` 一样在仓库 Secret 中定义 `SERVERCHAN_SENDKEY`
