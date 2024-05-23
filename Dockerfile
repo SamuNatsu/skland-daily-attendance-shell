@@ -1,7 +1,8 @@
 # Base image
 FROM alpine:latest
 
-# Set timezone
+# Environment variables
+ENV DOCKER=1
 ENV TZ=Asia/Shanghai
 
 # Install dependencies
@@ -9,12 +10,11 @@ RUN apk add --no-cache bash curl jq openssl tzdata
 
 # Copy file
 COPY attendance.sh .
-COPY entrypoint.sh .
 RUN chmod +x attendance.sh
-RUN chmod +x entrypoint.sh
 
 # Add task
-RUN echo "0       0       *       *       *       /attendance.sh 1>> /var/log/stdout.log 2>> /var/log/stderr.log" >> /etc/crontabs/root
+RUN echo '# min   hour    day     month   weekday command' >/etc/crontabs/root
+RUN echo '0       0       *       *       *       /attendance.sh' >>/etc/crontabs/root
 
 # Start command
-CMD /entrypoint.sh
+CMD /attendance.sh

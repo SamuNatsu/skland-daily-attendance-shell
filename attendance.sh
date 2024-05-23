@@ -23,21 +23,21 @@ SKLAND_BOARD_MAP[101]='开拓芯'
 #------------------------------------------------------------------------------
 
 # (str)
-info() {
+debug() {
   local timestamp=$(date +"%Y-%m-%dT%H:%M:%S%z")
-  echo "[$timestamp] [ INFO] $1" > /dev/stdout
+  echo "[$timestamp] [DEBUG] $1" >/proc/$PID/fd/1
 }
 
 # (str)
-debug() {
+info() {
   local timestamp=$(date +"%Y-%m-%dT%H:%M:%S%z")
-  echo "[$timestamp] [DEBUG] $1" > /dev/stderr
+  echo "[$timestamp] [ INFO] $1" >/proc/$PID/fd/1
 }
 
 # (str)
 error() {
   local timestamp=$(date +"%Y-%m-%dT%H:%M:%S%z")
-  echo "[$timestamp] [ERROR] $1" > /dev/stderr
+  echo "[$timestamp] [ERROR] $1" >/proc/$PID/fd/2
 }
 
 #------------------------------------------------------------------------------
@@ -427,9 +427,19 @@ do_attendance() {
 #------------------------------------------------------------------------------
 
 # 检查环境变量
-if [[ -z "$SKLAND_TOKEN" ]]; then
+if [[ -z $SKLAND_TOKEN ]]; then
   error '环境变量 "SKLAND_TOKEN" 未定义'
   exit 1
+fi
+
+# 配置环境
+PID=$$
+if [[ -n $DOCKER ]]; then
+  if [ -f /run/attendance.pid ]; then
+    PID=$(cat /run/attendance.pid)
+  else
+    echo -n $PID >/run/attendance.pid
+  fi
 fi
 
 # 执行多账号签到任务
@@ -440,3 +450,8 @@ for token in ${tokens[*]}; do
   do_attendance $token
   i=$(($i + 1))
 done
+
+# 执行 Docker 计划任务
+if [[ -n $DOCKER && $PID != $$ ]]; then
+  crond -f
+fi
