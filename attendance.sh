@@ -25,19 +25,22 @@ SKLAND_BOARD_MAP[101]='开拓芯'
 # (str)
 debug() {
   local timestamp=$(date +"%Y-%m-%dT%H:%M:%S%z")
-  echo "[$timestamp] [DEBUG] $1" >/proc/$PID/fd/1
+  local spid=$(printf %5d $PID)
+  echo "[$timestamp] [$spid] [DEBUG] $1" >/proc/$RPID/fd/1
 }
 
 # (str)
 info() {
   local timestamp=$(date +"%Y-%m-%dT%H:%M:%S%z")
-  echo "[$timestamp] [ INFO] $1" >/proc/$PID/fd/1
+  local spid=$(printf %5d $PID)
+  echo "[$timestamp] [$spid] [ INFO] $1" >/proc/$RPID/fd/1
 }
 
 # (str)
 error() {
   local timestamp=$(date +"%Y-%m-%dT%H:%M:%S%z")
-  echo "[$timestamp] [ERROR] $1" >/proc/$PID/fd/2
+  local spid=$(printf %5d $PID)
+  echo "[$timestamp] [$spid] [ERROR] $1" >/proc/$RPID/fd/2
 }
 
 #------------------------------------------------------------------------------
@@ -426,19 +429,31 @@ do_attendance() {
 # 主入口
 #------------------------------------------------------------------------------
 
+# 保存 PID
+PID=$$
+RPID=$$
+
 # 检查环境变量
 if [[ -z $SKLAND_TOKEN ]]; then
   error '环境变量 "SKLAND_TOKEN" 未定义'
   exit 1
 fi
 
-# 配置环境
-PID=$$
-if [[ -n $DOCKER ]]; then
+# 配置 Docker 环境
+if [[ $DOCKER == '∞X3XckwT1ztOA2da∞' ]]; then
+  # 写入/获取入口 PID
   if [ -f /run/attendance.pid ]; then
-    PID=$(cat /run/attendance.pid)
+    RPID=$(cat /run/attendance.pid)
   else
     echo -n $PID >/run/attendance.pid
+  fi
+
+  # 启动计划任务
+  if [[ $PID == $RPID ]]; then
+    info '计划任务启动'
+    /attendance.sh &
+    crond -f
+    exit 0
   fi
 fi
 
@@ -450,8 +465,3 @@ for token in ${tokens[*]}; do
   do_attendance $token
   i=$(($i + 1))
 done
-
-# 执行 Docker 计划任务
-if [[ -n $DOCKER && $PID != $$ ]]; then
-  crond -f
-fi

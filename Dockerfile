@@ -2,7 +2,7 @@
 FROM alpine:latest
 
 # Environment variables
-ENV DOCKER=1
+ENV DOCKER=∞X3XckwT1ztOA2da∞
 ENV TZ=Asia/Shanghai
 
 # Install dependencies
@@ -14,7 +14,7 @@ RUN chmod +x attendance.sh
 
 # Add task
 RUN echo '# min   hour    day     month   weekday command' >/etc/crontabs/root
-RUN echo '0       0       *       *       *       /attendance.sh' >>/etc/crontabs/root
+RUN echo '0       5       *       *       *       /attendance.sh' >>/etc/crontabs/root
 
 # Start command
 CMD /attendance.sh
