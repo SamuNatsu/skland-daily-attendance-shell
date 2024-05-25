@@ -22,6 +22,7 @@ SKLAND_BOARD_MAP[101]='开拓芯'
 # 日志函数
 #------------------------------------------------------------------------------
 
+# Debug 日志
 # (str)
 debug() {
   local timestamp=$(date +"%Y-%m-%dT%H:%M:%S%z")
@@ -29,6 +30,7 @@ debug() {
   echo "[$timestamp] [$spid] [DEBUG] $1" >/proc/$RPID/fd/1
 }
 
+# Info 日志
 # (str)
 info() {
   local timestamp=$(date +"%Y-%m-%dT%H:%M:%S%z")
@@ -36,6 +38,7 @@ info() {
   echo "[$timestamp] [$spid] [ INFO] $1" >/proc/$RPID/fd/1
 }
 
+# Error 日志
 # (str)
 error() {
   local timestamp=$(date +"%Y-%m-%dT%H:%M:%S%z")
@@ -81,13 +84,13 @@ get_privacy_name() {
 # 初始化
 notification_init() {
   local timestamp=$(date +"%Y-%m-%d %H:%M:%S %Z")
-  echo -ne "# 森空岛每日签到\n\n> $timestamp" > /tmp/skland-daily.log
+  echo -ne "# 森空岛每日签到\n\n> $timestamp" >/tmp/skland-daily.log
 }
 
 # 添加推送内容记录
 # (str)
 notification_add() {
-  echo -ne "\n\n$1" >> /tmp/skland-daily.log
+  echo -ne "\n\n$1" >>/tmp/skland-daily.log
 }
 
 # Bark 推送 API
@@ -381,6 +384,8 @@ do_attendance() {
   # OAuth 登陆
   local code=$(hypergryph_auth $1)
   if [[ -z $code ]]; then
+    notification_add '## 错误\n\n无法登陆鹰角网络通行证'
+    notification_execute
     return 1
   fi
   info 'OAuth 登陆成功'
@@ -388,6 +393,8 @@ do_attendance() {
   # 森空岛鉴权
   local tmp=$(skland_auth $code)
   if [[ -z $tmp ]]; then
+    notification_add '## 错误\n\n无法登陆森空岛'
+    notification_execute
     return 1
   fi
   local cred=$(awk 'NR==1' <<< $tmp)
@@ -397,6 +404,8 @@ do_attendance() {
   # 获取角色绑定
   local list=$(skland_get_binding $cred $token)
   if [[ -z $list ]]; then
+    notification_add '## 错误\n\n无法获取角色绑定'
+    notification_execute
     return 1
   fi
   info '角色绑定获取成功'
