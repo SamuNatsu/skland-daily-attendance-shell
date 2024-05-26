@@ -192,6 +192,8 @@ notification_smtp() {
   if [ $exit_code -ne 0 ]; then
     error "无法访问发送邮件: mail_exit=$exit_code, msg=$msg"
     return 1
+  else
+    info 'SMTP 推送成功'
   fi
 }
 
@@ -556,7 +558,7 @@ from         $SMTP_FROM\n\
 user         $SMTP_USER\n\
 password     $SMTP_PASSWD\n\n\
 account default: skland" >>/etc/msmtprc
-        echo "set realname=$SMTP_REAL_NAME\n\
+        echo -e "set realname=$SMTP_REAL_NAME\n\
 set from=$SMTP_FROM" >>/root/.muttrc
         info '邮件服务配置完成'
       fi

@@ -15,7 +15,6 @@ tls            on\n\
 tls_trust_file /etc/ssl/certs/ca-certificates.crt\n\
 logfile        /var/log/msmtp.log" >/etc/msmtprc
 RUN echo -e "set sendmail=/usr/bin/msmtp\n\
-set use_from=yes\n\
 set content_type=text/html" >/root/.muttrc
 
 # Copy file
