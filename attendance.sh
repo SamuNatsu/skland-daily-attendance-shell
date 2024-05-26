@@ -180,7 +180,7 @@ notification_smtp() {
   if [[ "$DOCKER" == '∞X3XckwT1ztOA2da∞' ]]; then
     echo $3 | mutt -s "$2" "$1" >/tmp/skland-daily-mail-send.log 2>&1
   else
-    echo $3 | mail -s "$2" "$1" >/tmp/skland-daily-mail-send.log 2>&1
+    echo $3 | mailx -a 'Content-Type: text/html' -s "$2" "$1" >/tmp/skland-daily-mail-send.log 2>&1
   fi
 
   # 处理返回值
