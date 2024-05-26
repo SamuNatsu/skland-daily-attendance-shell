@@ -556,7 +556,8 @@ from         $SMTP_FROM\n\
 user         $SMTP_USER\n\
 password     $SMTP_PASSWD\n\n\
 account default: skland" >>/etc/msmtprc
-        echo "set realname=$SMTP_REAL_NAME" >>/root/.muttrc
+        echo "set realname=$SMTP_REAL_NAME\n\
+set from=$SMTP_FROM" >>/root/.muttrc
         info '邮件服务配置完成'
       fi
 
