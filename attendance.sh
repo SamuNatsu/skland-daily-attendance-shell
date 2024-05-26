@@ -19,6 +19,12 @@ SKLAND_BOARD_MAP[100]='纳斯特港'
 SKLAND_BOARD_MAP[101]='开拓芯'
 
 #------------------------------------------------------------------------------
+# 全局变量
+#------------------------------------------------------------------------------
+
+_root_pid=$$
+
+#------------------------------------------------------------------------------
 # 日志函数
 #------------------------------------------------------------------------------
 
@@ -26,24 +32,24 @@ SKLAND_BOARD_MAP[101]='开拓芯'
 # (str)
 debug() {
   local timestamp=$(date +"%Y-%m-%dT%H:%M:%S%z")
-  local spid=$(printf %5d $PID)
-  echo "[$timestamp] [$spid] [DEBUG] $1" >/proc/$RPID/fd/1
+  local spid=$(printf %5d $$)
+  echo "[$timestamp] [$spid] [DEBUG] $1" >/proc/$_root_pid/fd/1
 }
 
 # Info 日志
 # (str)
 info() {
   local timestamp=$(date +"%Y-%m-%dT%H:%M:%S%z")
-  local spid=$(printf %5d $PID)
-  echo "[$timestamp] [$spid] [ INFO] $1" >/proc/$RPID/fd/1
+  local spid=$(printf %5d $$)
+  echo "[$timestamp] [$spid] [ INFO] $1" >/proc/$_root_pid/fd/1
 }
 
 # Error 日志
 # (str)
 error() {
   local timestamp=$(date +"%Y-%m-%dT%H:%M:%S%z")
-  local spid=$(printf %5d $PID)
-  echo "[$timestamp] [$spid] [ERROR] $1" >/proc/$RPID/fd/2
+  local spid=$(printf %5d $$)
+  echo "[$timestamp] [$spid] [ERROR] $1" >/proc/$_root_pid/fd/2
 }
 
 #------------------------------------------------------------------------------
@@ -51,30 +57,38 @@ error() {
 #------------------------------------------------------------------------------
 
 # 生成 API 签名
-# (token, path, query, data) -> signature, header
+# (token, path, data, query) -> signature, header
 generate_signature() {
   # 初始化 header
   local platform='1'
   local timestamp=$(($(date +%s) - 2))
-  local dId=''
-  local vName='1.5.1'
-  local header='{"platform":"'$platform'","timestamp":"'$timestamp'","dId":"'$dId'","vName":"'$vName'"}'
+  local d_id=''
+  local v_name='1.5.1'
+  local header=$(
+    jq \
+      -cnMS \
+      --arg platform  "$platform" \
+      --arg timestamp "$timestamp" \
+      --arg d_id      "$d_id" \
+      --arg v_name    "$v_name" \
+      '{platform: $platform, timestamp: $timestamp, dId: $d_id, vName: $v_name}'
+  )
 
   # 生成签名
-  local str=$2$3$4$timestamp$header
-  local hmac_sha256=$(echo -n $str | openssl dgst -sha256 -hmac $1 | awk '{print $2}')
-  local sign=$(echo -n $hmac_sha256 | md5sum | awk '{print $1}')
+  local str="$2$4$3$timestamp$header"
+  local hmac_sha256=$(echo -n "$str" | openssl dgst -sha256 -hmac "$1" | awk '{print $2}')
+  local sign=$(echo -n "$hmac_sha256" | md5sum | awk '{print $1}')
 
   # 返回签名和 header
-  echo $sign
-  echo $header
+  echo "$sign"
+  echo "$header"
 }
 
 # 名字打码
 # (name) -> privacy_name
 get_privacy_name() {
-  local privacy=$(sed 's/./*/g' <<< ${1:1:-1})
-  echo ${1:0:1}$privacy${1: -1}
+  local privacy=$(sed 's/./*/g' <<< "${1:1:-1}")
+  echo "${1:0:1}$privacy${1: -1}"
 }
 
 #------------------------------------------------------------------------------
@@ -85,24 +99,34 @@ get_privacy_name() {
 notification_init() {
   local timestamp=$(date +"%Y-%m-%d %H:%M:%S %Z")
   echo -ne "# 森空岛每日签到\n\n> $timestamp" >/tmp/skland-daily.log
+  echo -ne "<h1>森空岛每日签到</h1><blockquote>$timestamp</blockquote>" >/tmp/skland-daily-mail.log
 }
 
 # 添加推送内容记录
-# (str)
+# (str, mstr)
 notification_add() {
   echo -ne "\n\n$1" >>/tmp/skland-daily.log
+  echo -ne "$2" >>/tmp/skland-daily-mail.log
 }
 
 # Bark 推送 API
 # (url, title, content)
 notification_bark() {
   # 发送请求
+  local body=$(
+    jq \
+      -cnMS \
+      --arg title "$2" \
+      --arg body  "$3" \
+      --arg group 'Skland' \
+      '{title: $title, body: $body, group: $group}'
+  )
   local response=$(
     curl \
       -s \
       -H 'Content-Type: application/json; charset=utf-8' \
-      -d '{"title":"'$2'","body":"'$3'","group":"Skland"}' \
-      $1
+      -d "$body" \
+      "$1"
   )
 
   # 检查 CURL 返回值
@@ -119,11 +143,18 @@ notification_bark() {
 # (key, title, content)
 notification_server_chan() {
   # 发送请求
+  local body=$(
+    jq \
+      -cnMS \
+      --arg title "$2" \
+      --arg desp  "$3" \
+      '{title: $title, desp: $desp}'
+  )
   local response=$(
     curl \
       -s \
       -H 'Content-Type: application/json; charset=utf-8' \
-      -d '{"title":"'$2'","desp":"'$3'"}' \
+      -d "$body" \
       "https://sctapi.ftqq.com/$1.send"
   )
 
@@ -134,10 +165,28 @@ notification_server_chan() {
   fi
 
   # 检查响应
-  if [[ $(jq '.code == 0' <<< $response) == 'true' ]]; then
+  if [[ $(jq '.code == 0' <<< "$response") == 'true' ]]; then
     info 'Server 酱推送成功'
   else
     error "Server 酱推送失败: response=$response"
+    return 1
+  fi
+}
+
+# SMTP 推送
+# (to, subject, content)
+notification_smtp() {
+  # 发送邮件
+  echo $3 | mail -s "$2" "$1" >/tmp/skland-daily-mail-send.log 2>&1
+
+  # 处理返回值
+  local exit_code=$?
+  local msg=$(cat /tmp/skland-daily-mail-send.log)
+  rm -f /tmp/skland-daily-mail-send.log
+
+  # 检查返回值
+  if [ $exit_code -ne 0 ]; then
+    error "无法访问发送邮件: mail_exit=$exit_code, msg=$msg"
     return 1
   fi
 }
@@ -146,16 +195,22 @@ notification_server_chan() {
 notification_execute() {
   # 获取记录
   local content=$(cat /tmp/skland-daily.log)
-  rm -f /tmp/skland-daily.log
+  local mail_content=$(cat /tmp/skland-daily-mail.log)
+  rm -f /tmp/skland-daily.log /tmp/skland-daily-mail.log
 
   # Bark 推送
-  if [[ -n $BARK_URL ]]; then
-    notification_bark $BARK_URL '【森空岛每日签到】' "$content"
+  if [[ -n "$BARK_URL" ]]; then
+    notification_bark "$BARK_URL" '【森空岛每日签到】' "$content"
   fi
 
   # Server 酱推送
-  if [[ -n $SERVERCHAN_SENDKEY ]]; then
-    notification_server_chan $SERVERCHAN_SENDKEY '【森空岛每日签到】' "$content"
+  if [[ -n "$SERVERCHAN_SENDKEY" ]]; then
+    notification_server_chan "$SERVERCHAN_SENDKEY" '【森空岛每日签到】' "$content"
+  fi
+
+  # SMTP 推送
+  if [[ -n "$SMTP_TO" ]]; then
+    notification_smtp "$SMTP_TO" '【森空岛每日签到】' "$mail_content"
   fi
 }
 
@@ -167,6 +222,14 @@ notification_execute() {
 # (token) -> code
 hypergryph_auth() {
   # 发送请求
+  local body=$(
+    jq \
+      -cnMS \
+      --arg     app_code '4ca99fa6b56cc2ba' \
+      --arg     token    "$1" \
+      --argjson type     '0' \
+      '{appCode: $app_code, token: $token, type: $type}'
+  )
   local response=$(
     curl \
       -s \
@@ -174,8 +237,8 @@ hypergryph_auth() {
       -H 'Accept-Encoding: gzip' \
       -H 'Connection: close' \
       -H 'Content-Type: application/json; charset=utf-8' \
-      -d '{"appCode":"4ca99fa6b56cc2ba","token":"'$1'","type":0}' \
-      $HYPERGRYPH_OAUTH_URL
+      -d "$body" \
+      "$HYPERGRYPH_OAUTH_URL"
   )
 
   # 检查 CURL 返回值
@@ -185,14 +248,14 @@ hypergryph_auth() {
   fi
 
   # 检查响应
-  if [[ $(jq '.status != 0' <<< $response) == 'true' ]]; then
-    local msg=$(jq -r '.msg' <<< $response)
+  if [[ $(jq '.status != 0' <<< "$response") == 'true' ]]; then
+    local msg=$(jq -r '.msg' <<< "$response")
     error "无法登陆鹰角网络通行证: msg=$msg"
     return 1
   fi
 
   # 返回 code
-  echo $(jq -r '.data.code' <<< $response)
+  echo $(jq -r '.data.code' <<< "$response")
 }
 
 #------------------------------------------------------------------------------
@@ -203,6 +266,13 @@ hypergryph_auth() {
 # (code) -> cred, token
 skland_auth() {
   # 发送请求
+  local body=$(
+    jq \
+      -cnMS \
+      --arg     code "$1" \
+      --argjson kind '1' \
+      '{code: $code, kind: $kind}'
+  )
   local response=$(
     curl \
       -s \
@@ -210,8 +280,8 @@ skland_auth() {
       -H 'Accept-Encoding: gzip' \
       -H 'Connection: close' \
       -H 'Content-Type: application/json; charset=utf-8' \
-      -d '{"code":"'$1'","kind":1}' \
-      $SKLAND_AUTH_URL
+      -d "$body" \
+      "$SKLAND_AUTH_URL"
   )
 
   # 检查 CURL 返回值
@@ -221,24 +291,24 @@ skland_auth() {
   fi
 
   # 检查响应
-  if [[ $(jq '.code != 0' <<< $response) == 'true' ]]; then
-    local msg=$(jq -r '.message' <<< $response)
+  if [[ $(jq '.code != 0' <<< "$response") == 'true' ]]; then
+    local msg=$(jq -r '.message' <<< "$response")
     error "无法鉴权: message=$msg"
     return 1
   fi
 
   # 返回 cred 和 token
-  echo $(jq -r '.data.cred' <<< $response)
-  echo $(jq -r '.data.token' <<< $response)
+  echo $(jq -r '.data.cred' <<< "$response")
+  echo $(jq -r '.data.token' <<< "$response")
 }
 
 # 获得角色绑定信息
 # (cred, token) -> list
 skland_get_binding() {
   # 获得签名和 header
-  local tmp=$(generate_signature $2 '/api/v1/game/player/binding')
-  local sign=$(awk 'NR==1' <<< $tmp)
-  local header=$(awk 'NR==2' <<< $tmp)
+  local tmp=$(generate_signature "$2" '/api/v1/game/player/binding')
+  local sign=$(awk 'NR==1' <<< "$tmp")
+  local header=$(awk 'NR==2' <<< "$tmp")
 
   # 发送请求
   local response=$(
@@ -248,13 +318,13 @@ skland_get_binding() {
       -H 'Accept-Encoding: gzip' \
       -H 'Connection: close' \
       -H 'Content-Type: application/json; charset=utf-8' \
-      -H "Platform: $(jq -r '.platform' <<< $header)" \
-      -H "Timestamp: $(jq -r '.timestamp' <<< $header)" \
-      -H "Did: $(jq -r '.dId' <<< $header)" \
-      -H "Vname: $(jq -r '.vName' <<< $header)" \
+      -H "Platform: $(jq -r '.platform' <<< "$header")" \
+      -H "Timestamp: $(jq -r '.timestamp' <<< "$header")" \
+      -H "Did: $(jq -r '.dId' <<< "$header")" \
+      -H "Vname: $(jq -r '.vName' <<< "$header")" \
       -H "Sign: $sign" \
       -H "Cred: $1" \
-      $SKLAND_BINDING_URL
+      "$SKLAND_BINDING_URL"
   )
 
   # 检查 CURL 返回值
@@ -264,23 +334,29 @@ skland_get_binding() {
   fi
 
   # 检查响应
-  if [[ $(jq '.code != 0' <<< $response) == 'true' ]]; then
-    local msg=$(jq -r '.message' <<< $response)
+  if [[ $(jq '.code != 0' <<< "$response") == 'true' ]]; then
+    local msg=$(jq -r '.message' <<< "$response")
     error "无法获取角色绑定: message=$msg"
     return 1
   fi
 
   # 返回角色绑定表
-  echo $(jq -c '.data.list | map(.bindingList) | flatten(1)' <<< $response)
+  echo $(jq -c '.data.list | map(.bindingList) | flatten(1)' <<< "$response")
 }
 
 # 森空岛检票
 # (cred, token, id)
 skland_check_in() {
   # 获得签名和 header
-  local tmp=$(generate_signature $2 '/api/v1/score/checkin' '' '{"gameId":'$3'}')
-  local sign=$(awk 'NR==1' <<< $tmp)
-  local header=$(awk 'NR==2' <<< $tmp)
+  local body=$(
+    jq \
+      -cnMS \
+      --argjson game_id "$3" \
+      '{gameId: $game_id}'
+  )
+  local tmp=$(generate_signature "$2" '/api/v1/score/checkin' "$body")
+  local sign=$(awk 'NR==1' <<< "$tmp")
+  local header=$(awk 'NR==2' <<< "$tmp")
 
   # 发送请求
   local response=$(
@@ -290,14 +366,14 @@ skland_check_in() {
       -H 'Accept-Encoding: gzip' \
       -H 'Connection: close' \
       -H 'Content-Type: application/json; charset=utf-8' \
-      -H "Platform: $(jq -r '.platform' <<< $header)" \
-      -H "Timestamp: $(jq -r '.timestamp' <<< $header)" \
-      -H "Did: $(jq -r '.dId' <<< $header)" \
-      -H "Vname: $(jq -r '.vName' <<< $header)" \
+      -H "Platform: $(jq -r '.platform' <<< "$header")" \
+      -H "Timestamp: $(jq -r '.timestamp' <<< "$header")" \
+      -H "Did: $(jq -r '.dId' <<< "$header")" \
+      -H "Vname: $(jq -r '.vName' <<< "$header")" \
       -H "Sign: $sign" \
       -H "Cred: $1" \
-      -d '{"gameId":'$3'}' \
-      $SKLAND_CHECKIN_URL
+      -d "$body" \
+      "$SKLAND_CHECKIN_URL"
   )
 
   # 检查 CURL 返回值
@@ -307,13 +383,13 @@ skland_check_in() {
   fi
 
   # 检查响应
-  local board=${SKLAND_BOARD_MAP[$3]}
-  if [[ $(jq '.code == 0' <<< $response) == 'true' ]]; then
-    notification_add "版面【$board】检票成功"
+  local board="${SKLAND_BOARD_MAP[$3]}"
+  if [[ $(jq '.code == 0' <<< "$response") == 'true' ]]; then
+    notification_add "版面【$board】检票成功" "<p>版面【$board】检票成功</p>"
     info "版面【$board】检票成功"
   else
-    local msg=$(jq -r '.message' <<< $response)
-    notification_add "版面【$board】检票成功，错误信息：$msg"
+    local msg=$(jq -r '.message' <<< "$response")
+    notification_add "版面【$board】检票失败，错误信息：$msg" "<p>版面【$board】检票失败，错误信息：$msg</p>"
     error "版面【$board】检票失败: message=$msg"
     return 1
   fi
@@ -323,16 +399,23 @@ skland_check_in() {
 # (cred, token, item)
 skland_attendance() {
   # 提取角色数据
-  local uid=$(jq -r '.uid' <<< $3)
-  local cid=$(jq -r '.channelMasterId' <<< $3)
-  local cname=$(jq -r '.channelName' <<< $3)
-  local nname=$(jq -r '.nickName' <<< $3)
-  local pname=$(get_privacy_name $nname)
+  local uid=$(jq -r '.uid' <<< "$3")
+  local cid=$(jq -r '.channelMasterId' <<< "$3")
+  local cname=$(jq -r '.channelName' <<< "$3")
+  local nname=$(jq -r '.nickName' <<< "$3")
+  local pname=$(get_privacy_name "$nname")
 
   # 获得签名和 header
-  local tmp=$(generate_signature $2 '/api/v1/game/attendance' '' '{"uid":"'$uid'","gameId":"'$cid'"}')
-  local sign=$(awk 'NR==1' <<< $tmp)
-  local header=$(awk 'NR==2' <<< $tmp)
+  local body=$(
+    jq \
+      -cnMS \
+      --arg uid "$uid" \
+      --arg game_id "$cid" \
+      '{uid: $uid, gameId: $game_id}'
+  )
+  local tmp=$(generate_signature "$2" '/api/v1/game/attendance' "$body")
+  local sign=$(awk 'NR==1' <<< "$tmp")
+  local header=$(awk 'NR==2' <<< "$tmp")
 
   # 发送请求
   local response=$(
@@ -342,14 +425,14 @@ skland_attendance() {
       -H 'Accept-Encoding: gzip' \
       -H 'Connection: close' \
       -H 'Content-Type: application/json; charset=utf-8' \
-      -H "Platform: $(jq -r '.platform' <<< $header)" \
-      -H "Timestamp: $(jq -r '.timestamp' <<< $header)" \
-      -H "Did: $(jq -r '.dId' <<< $header)" \
-      -H "Vname: $(jq -r '.vName' <<< $header)" \
+      -H "Platform: $(jq -r '.platform' <<< "$header")" \
+      -H "Timestamp: $(jq -r '.timestamp' <<< "$header")" \
+      -H "Did: $(jq -r '.dId' <<< "$header")" \
+      -H "Vname: $(jq -r '.vName' <<< "$header")" \
       -H "Sign: $sign" \
       -H "Cred: $1" \
-      -d '{"uid":"'$uid'","gameId":"'$cid'"}' \
-      $SKLAND_ATTENDANCE_URL
+      -d "body" \
+      "$SKLAND_ATTENDANCE_URL"
   )
 
   # 检查 CURL 返回值
@@ -359,13 +442,13 @@ skland_attendance() {
   fi
 
   # 检查响应
-  if [[ $(jq '.code == 0' <<< $response) == 'true' ]]; then
-    local awards=$(jq '.data.awards | map([.resource.name, .count]) | map(join(" x")) | join(", ")' <<< $response)
-    notification_add "$cname - $pname 签到成功，获得了：$awards"
+  if [[ $(jq '.code == 0' <<< "$response") == 'true' ]]; then
+    local awards=$(jq '.data.awards | map([.resource.name, .count]) | map(join(" x")) | join(", ")' <<< "$response")
+    notification_add "$cname - $pname 签到成功，获得了：$awards" "<p>$cname - $pname 签到成功，获得了：$awards</p>"
     info "$cname - $pname 签到成功，获得了：$awards"
   else
-    local msg=$(jq -r '.message' <<< $response)
-    notification_add "$cname - $pname 签到失败，错误信息：$msg"
+    local msg=$(jq -r '.message' <<< "$response")
+    notification_add "$cname - $pname 签到失败，错误信息：$msg" "<p>$cname - $pname 签到失败，错误信息：$msg</p>"
     error "$cname - $pname 签到失败: message=$msg"
     return 1
   fi
@@ -382,49 +465,51 @@ do_attendance() {
   notification_init
 
   # OAuth 登陆
-  local code=$(hypergryph_auth $1)
-  if [[ -z $code ]]; then
-    notification_add '## 错误\n\n无法登陆鹰角网络通行证'
+  local code=$(hypergryph_auth "$1")
+  if [[ -z "$code" ]]; then
+    notification_add '## 错误\n\n无法登陆鹰角网络通行证' '<h2>错误</h2><p>无法登陆鹰角网络通行证</p>'
     notification_execute
     return 1
   fi
   info 'OAuth 登陆成功'
 
   # 森空岛鉴权
-  local tmp=$(skland_auth $code)
-  if [[ -z $tmp ]]; then
-    notification_add '## 错误\n\n无法登陆森空岛'
+  local tmp=$(skland_auth "$code")
+  if [[ -z "$tmp" ]]; then
+    notification_add '## 错误\n\n无法登陆森空岛' '<h2>错误</h2><p>无法登陆森空岛</p>'
     notification_execute
     return 1
   fi
-  local cred=$(awk 'NR==1' <<< $tmp)
-  local token=$(awk 'NR==2' <<< $tmp)
+  local cred=$(awk 'NR==1' <<< "$tmp")
+  local token=$(awk 'NR==2' <<< "$tmp")
   info '森空岛鉴权成功'
 
   # 获取角色绑定
-  local list=$(skland_get_binding $cred $token)
-  if [[ -z $list ]]; then
-    notification_add '## 错误\n\n无法获取角色绑定'
+  local list=$(skland_get_binding "$cred" "$token")
+  if [[ -z "$list" ]]; then
+    notification_add '## 错误\n\n无法获取角色绑定' '<h2>错误</h2><p>无法获取角色绑定</p>'
     notification_execute
     return 1
   fi
   info '角色绑定获取成功'
 
   # 森空岛检票
-  notification_add '## 森空岛各版面每日检票'
-  for id in ${!SKLAND_BOARD_MAP[*]}; do
-    skland_check_in $cred $token $id &
+  notification_add '## 森空岛各版面每日检票' '<h2>森空岛各版面每日检票</h2>'
+
+  declare id
+  for id in "${!SKLAND_BOARD_MAP[*]}"; do
+    skland_check_in "$cred" "$token" "$id" &
   done
   wait
   info '森空岛检票完毕'
 
   # 明日方舟签到
-  notification_add '## 明日方舟签到'
-  local list_len=$(jq 'length' <<< $list)
+  notification_add '## 明日方舟签到' '<h2>明日方舟签到</h2>'
+  local list_len=$(jq 'length' <<< "$list")
   local i=0
   while [ $i -lt $list_len ]; do
-    local item=$(jq -c ".[$i]" <<< $list)
-    skland_attendance $cred $token $item &
+    local item=$(jq -c ".[$i]" <<< "$list")
+    skland_attendance "$cred" "$token" "$item" &
     i=$(($i + 1))
   done
   wait
@@ -438,39 +523,41 @@ do_attendance() {
 # 主入口
 #------------------------------------------------------------------------------
 
-# 保存 PID
-PID=$$
-RPID=$$
-
-# 检查环境变量
-if [[ -z $SKLAND_TOKEN ]]; then
-  error '环境变量 "SKLAND_TOKEN" 未定义'
-  exit 1
-fi
-
-# 配置 Docker 环境
-if [[ $DOCKER == '∞X3XckwT1ztOA2da∞' ]]; then
-  # 写入/获取入口 PID
-  if [ -f /run/attendance.pid ]; then
-    RPID=$(cat /run/attendance.pid)
-  else
-    echo -n $PID >/run/attendance.pid
+main() {
+  # 检查环境变量
+  if [[ -z "$SKLAND_TOKEN" ]]; then
+    error '环境变量 "SKLAND_TOKEN" 未定义'
+    exit 1
   fi
 
-  # 启动计划任务
-  if [[ $PID == $RPID ]]; then
-    info '计划任务启动'
-    /attendance.sh &
-    crond -f
-    exit 0
-  fi
-fi
+  # 配置 Docker 环境
+  if [[ "$DOCKER" == '∞X3XckwT1ztOA2da∞' ]]; then
+    # 写入/获取入口 PID
+    if [ -f /run/attendance.pid ]; then
+      _root_pid=$(cat /run/attendance.pid)
+    else
+      echo -n $$ >/run/attendance.pid
+    fi
 
-# 执行多账号签到任务
-IFS="," read -ra tokens <<< $SKLAND_TOKEN
-i=1
-for token in ${tokens[*]}; do
-  info "正在处理账号 #$i"
-  do_attendance $token
-  i=$(($i + 1))
-done
+    # 启动计划任务
+    if [[ $$ == $_root_pid ]]; then
+      info '计划任务启动'
+      /attendance.sh &
+      crond -f
+      exit 0
+    fi
+  fi
+
+  # 执行多账号签到任务
+  declare -a tokens
+  IFS=',' read -ra tokens <<< "$SKLAND_TOKEN"
+
+  local i=1
+  declare token
+  for token in "${tokens[*]}"; do
+    info "正在处理账号 #$i"
+    do_attendance "$token"
+    i=$(($i + 1))
+  done
+}
+main
