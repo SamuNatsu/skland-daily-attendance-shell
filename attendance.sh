@@ -66,7 +66,7 @@ generate_signature() {
   local v_name='1.5.1'
   local header=$(
     jq \
-      -cnMS \
+      -cnM \
       --arg platform  "$platform" \
       --arg timestamp "$timestamp" \
       --arg d_id      "$d_id" \
@@ -431,7 +431,7 @@ skland_attendance() {
       -H "Vname: $(jq -r '.vName' <<< "$header")" \
       -H "Sign: $sign" \
       -H "Cred: $1" \
-      -d "body" \
+      -d "$body" \
       "$SKLAND_ATTENDANCE_URL"
   )
 
@@ -497,7 +497,7 @@ do_attendance() {
   notification_add '## 森空岛各版面每日检票' '<h2>森空岛各版面每日检票</h2>'
 
   declare id
-  for id in "${!SKLAND_BOARD_MAP[*]}"; do
+  for id in ${!SKLAND_BOARD_MAP[*]}; do
     skland_check_in "$cred" "$token" "$id" &
   done
   wait
@@ -568,7 +568,7 @@ account default: skland" >>/etc/msmtprc
 
   local i=1
   declare token
-  for token in "${tokens[*]}"; do
+  for token in ${tokens[*]}; do
     info "正在处理账号 #$i"
     do_attendance "$token"
     i=$(($i + 1))
