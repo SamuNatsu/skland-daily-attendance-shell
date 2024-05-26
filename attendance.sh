@@ -551,6 +551,7 @@ user         $SMTP_USER\n\
 password     $SMTP_PASSWD\n\n\
 account default: skland" >>/etc/msmtprc
       echo "set readlname=$SMTP_REAL_NAME" >>/root/.muttrc
+      alias mail=mutt
     fi
 
     # 启动计划任务
