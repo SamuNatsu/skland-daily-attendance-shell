@@ -88,4 +88,23 @@ services:
 
 你需要设置环境变量 `SERVERCHAN_SENDKEY`，填入你 Server 酱的推送密钥
 
-对于白嫖 GitHub Actions 用户，你需要像 [白嫖 GitHub Actions 使用](#白嫖-github-actions-使用) 中定义 `SKLAND_TOKEN` 一样在仓库 Secret 中定义 `SERVERCHAN_SENDKEY`
+对于白嫖 GitHub Actions 用户，配置环境变量的方法如 [Bark 推送](#bark-推送) 中的一样
+
+### SMTP 推送
+
+**SMTP 推送强制要求使用 TLS 发送，并且要求进行登陆验证**
+
+你需要配置如下环境变量：
+
+|名字|作用|示例值|
+|:---:|:---:|:---:|
+|`SMTP_HOST`|SMTP 主机地址|-|
+|`SMTP_PORT`|SMTP 端口|一般来说是 `465` 或 `587`|
+|`SMTP_USER`|SMTP 用户名|一般是一个邮箱地址|
+|`SMTP_PASSWD`|SMTP 密码|-|
+|`SMTP_FROM`|发送者邮箱|一般来说应该和用户名一样|
+|`SMTP_TO`|接收者邮箱|-|
+|`SMTP_REAL_NAME`|发送者名字|-|
+|`SMTP_START_TLS`|启用全程 TLS|只能是 `on` 或 `off`|
+
+对于白嫖 GitHub Actions 用户，配置环境变量的方法如 [Bark 推送](#bark-推送) 中的一样
