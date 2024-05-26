@@ -539,9 +539,11 @@ main() {
       echo -n $$ >/run/attendance.pid
     fi
 
-    # 配置邮件服务
-    if [[ -n "$SMTP_TO" ]]; then
-      echo -e "# Skland\n\
+    # 启动计划任务
+    if [[ $$ == $_root_pid ]]; then
+      # 配置邮件服务
+      if [[ -n "$SMTP_TO" ]]; then
+        echo -e "# Skland\n\
 account      skland\n\
 host         $SMTP_HOST\n\
 port         $SMTP_PORT\n\
@@ -550,12 +552,11 @@ from         $SMTP_FROM\n\
 user         $SMTP_USER\n\
 password     $SMTP_PASSWD\n\n\
 account default: skland" >>/etc/msmtprc
-      echo "set readlname=$SMTP_REAL_NAME" >>/root/.muttrc
-      alias mail=mutt
-    fi
+        echo "set readlname=$SMTP_REAL_NAME" >>/root/.muttrc
+        info '邮件服务配置完成'
+      fi
 
-    # 启动计划任务
-    if [[ $$ == $_root_pid ]]; then
+      # 启动计划任务
       info '计划任务启动'
       /attendance.sh &
       crond -f
