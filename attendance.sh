@@ -177,7 +177,11 @@ notification_server_chan() {
 # (to, subject, content)
 notification_smtp() {
   # 发送邮件
-  echo $3 | mail -s "$2" "$1" >/tmp/skland-daily-mail-send.log 2>&1
+  if [[ "$DOCKER" == '∞X3XckwT1ztOA2da∞' ]]; then
+    echo $3 | mutt -s "$2" "$1" >/tmp/skland-daily-mail-send.log 2>&1
+  else
+    echo $3 | mail -s "$2" "$1" >/tmp/skland-daily-mail-send.log 2>&1
+  fi
 
   # 处理返回值
   local exit_code=$?
@@ -552,7 +556,7 @@ from         $SMTP_FROM\n\
 user         $SMTP_USER\n\
 password     $SMTP_PASSWD\n\n\
 account default: skland" >>/etc/msmtprc
-        echo "set readlname=$SMTP_REAL_NAME" >>/root/.muttrc
+        echo "set realname=$SMTP_REAL_NAME" >>/root/.muttrc
         info '邮件服务配置完成'
       fi
 

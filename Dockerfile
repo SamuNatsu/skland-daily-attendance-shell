@@ -16,7 +16,6 @@ tls_trust_file /etc/ssl/certs/ca-certificates.crt\n\
 logfile        /var/log/msmtp.log" >/etc/msmtprc
 RUN echo -e "set sendmail=/usr/bin/msmtp\n\
 set use_from=yes" >/root/.muttrc
-RUN echo 'alias mail=mutt' >>/root/.bashrc
 
 # Copy file
 COPY attendance.sh .
