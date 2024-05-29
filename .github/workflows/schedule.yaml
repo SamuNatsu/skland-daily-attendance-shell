@@ -18,3 +18,12 @@ jobs:
           BARK_URL: ${{ secrets.BARK_URL }}
           SERVERCHAN_SENDKEY: ${{ secrets.SERVERCHAN_SENDKEY }}
           SKLAND_TOKEN: ${{ secrets.SKLAND_TOKEN }}
+          SMTP_FROM: ${{ secrets.SMTP_FROM }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PASSWD: ${{ secrets.SMTP_PASSWD }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_REAL_NAME: ${{ secrets.SMTP_REAL_NAME }}
+          SMTP_START_TLS: ${{ secrets.SMTP_START_TLS }}
+          SMTP_TO: ${{ secrets.SMTP_TO }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+

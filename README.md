@@ -92,7 +92,7 @@ services:
 
 ### SMTP 推送
 
-**SMTP 推送强制要求使用 TLS 发送，并且要求进行登陆验证**
+**SMTP 推送强制要求使用 TLS 协议，并且要求进行登陆验证**
 
 你需要配置如下环境变量：
 
@@ -105,6 +105,7 @@ services:
 |`SMTP_FROM`|发送者邮箱|一般来说应该和用户名一样|
 |`SMTP_TO`|接收者邮箱|-|
 |`SMTP_REAL_NAME`|发送者名字|-|
-|`SMTP_START_TLS`|启用全程 TLS|只能是 `on` 或 `off`|
+|`SMTP_START_TLS`|启用 STARTTLS 协议|只能是 `on` 或 `off`|
 
 对于白嫖 GitHub Actions 用户，配置环境变量的方法如 [Bark 推送](#bark-推送) 中的一样
+
