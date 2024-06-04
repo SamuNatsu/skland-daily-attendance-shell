@@ -85,9 +85,9 @@ generate_signature() {
 }
 
 # 名字打码
-# (name) -> privacy_name
+# (name, replace) -> privacy_name
 get_privacy_name() {
-  local privacy=$(sed 's/./*/g' <<< "${1:1:-1}")
+  local privacy=$(sed "s#.#$2#g" <<< "${1:1:-1}")
   echo "${1:0:1}$privacy${1: -1}"
 }
 
@@ -409,7 +409,8 @@ skland_attendance() {
   local cid=$(jq -r '.channelMasterId' <<< "$3")
   local cname=$(jq -r '.channelName' <<< "$3")
   local nname=$(jq -r '.nickName' <<< "$3")
-  local pname=$(get_privacy_name "$nname")
+  local pname=$(get_privacy_name "$nname" '*')
+  local mdpname=$(get_privacy_name "$nname" '\\*')
 
   # 获得签名和 header
   local body=$(
@@ -450,11 +451,11 @@ skland_attendance() {
   # 检查响应
   if [[ $(jq '.code == 0' <<< "$response") == 'true' ]]; then
     local awards=$(jq '.data.awards | map([.resource.name, .count]) | map(join(" x")) | join(", ")' <<< "$response")
-    notification_add "$cname - $pname 签到成功，获得了：$awards" "<p>$cname - $pname 签到成功，获得了：$awards</p>"
+    notification_add "$cname - $mdpname 签到成功，获得了：$awards" "<p>$cname - $pname 签到成功，获得了：$awards</p>"
     info "$cname - $pname 签到成功，获得了：$awards"
   else
     local msg=$(jq -r '.message' <<< "$response")
-    notification_add "$cname - $pname 签到失败，错误信息：$msg" "<p>$cname - $pname 签到失败，错误信息：$msg</p>"
+    notification_add "$cname - $mdpname 签到失败，错误信息：$msg" "<p>$cname - $pname 签到失败，错误信息：$msg</p>"
     error "$cname - $pname 签到失败: message=$msg"
     return 1
   fi
