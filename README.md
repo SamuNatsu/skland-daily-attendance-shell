@@ -6,22 +6,21 @@
 
 ## 前置需求
 
-* 脚本需要在 [Bash](https://www.gnu.org/software/bash) 环境下运行，Windows 用户请使用 [MSYS2](https://www.msys2.org)、[WSL2](https://learn.microsoft.com/zh-cn/windows/wsl/install) 或虚拟机等拥有 Bash 的环境运行
-* 脚本需要使用 [curl](https://curl.se)、[OpenSSL](https://www.openssl.org) 和 [jq](https://jqlang.github.io/jq) 这三个第三方软件包
+- 脚本需要在 [Bash](https://www.gnu.org/software/bash) 环境下运行，Windows 用户请使用 [MSYS2](https://www.msys2.org)、[WSL2](https://learn.microsoft.com/zh-cn/windows/wsl/install) 或虚拟机等拥有 Bash 的环境运行
+- 脚本需要使用 [curl](https://curl.se)、[OpenSSL](https://www.openssl.org) 和 [jq](https://jqlang.github.io/jq) 这三个第三方软件包
 
 ## 使用方法
 
 ### 直接使用
 
-先登录森空岛网页版，然后打开 <https://web-api.skland.com/account/info/hg> 记下 `content` 字段的值
+1. 登录森空岛网页版，然后打开网址 <https://web-api.skland.com/account/info/hg>，记下 `content` 字段的值 **（保护账号安全，请勿向他人透露该值！）**
 
-设置环境变量 `SKLAND_TOKEN`，值为上一步获取的 `content`，如果需要多账号支持，请使用半角逗号 `,` 分割
+2. 设置环境变量 `SKLAND_TOKEN`，值为上一步获取的 `content`；如果需要多账号支持，请使用半角逗号 `,` 分隔各个 `content`，如：`xxxx,yyyy,zzzz`
 
-运行脚本，它将自动帮你完成签到服务
-
-```sh
-SKLAND_TOKEN=xxxx,yyyy,zzzz ./attendance.sh
-```
+3. 运行脚本如下，它将自动帮你完成签到服务
+   ```sh
+   SKLAND_TOKEN=xxxx,yyyy,zzzz ./attendance.sh
+   ```
 
 ### 在 Docker 中使用
 
@@ -29,7 +28,7 @@ Docker 镜像在 <https://hub.docker.com/r/snrainiar/skland-daily-attendance-she
 
 你需要根据 [直接使用](#直接使用) 中的步骤获得环境变量 `SKLAND_TOKEN` 的值，然后把它编写到 Docker 启动命令中启动镜像即可
 
-镜像中配置了计划任务，会在每天的 05:00(CST) 执行一次签到，因此你不需要手动重启镜像
+镜像中配置了计划任务，会在每天的 05:00（北京时间） 执行一次签到，因此你不需要手动重启镜像
 
 ```sh
 docker run \
@@ -74,7 +73,7 @@ services:
 
    点击 `Actions` -> 点击左侧 `Schedule` -> 点击 `Run workflow` -> 点击按钮 `Run workflow`
 
-***注意：如果仓库 60 天内没有活动，其计划 Actions 会被自动禁用，届时你需要手动重启一下（一般会发邮件通知你 Actions 禁用）***
+**_注意：如果仓库 60 天内没有活动，其计划 Actions 会被自动禁用，届时你需要手动重启一下（一般会发邮件通知你 Actions 禁用）_**
 
 ## 通知推送功能
 
@@ -96,16 +95,21 @@ services:
 
 你需要配置如下环境变量：
 
-|名字|作用|示例值|
-|:---:|:---:|:---:|
-|`SMTP_HOST`|SMTP 主机地址|-|
-|`SMTP_PORT`|SMTP 端口|一般来说是 `465` 或 `587`|
-|`SMTP_USER`|SMTP 用户名|一般是一个邮箱地址|
-|`SMTP_PASSWD`|SMTP 密码|-|
-|`SMTP_FROM`|发送者邮箱|一般来说应该和用户名一样|
-|`SMTP_TO`|接收者邮箱|-|
-|`SMTP_REAL_NAME`|发送者名字|-|
-|`SMTP_START_TLS`|启用 STARTTLS 协议|只能是 `on` 或 `off`|
+|       名字       |        作用        |          示例值           |
+| :--------------: | :----------------: | :-----------------------: |
+|   `SMTP_HOST`    |   SMTP 主机地址    |             -             |
+|   `SMTP_PORT`    |     SMTP 端口      | 一般来说是 `465` 或 `587` |
+|   `SMTP_USER`    |    SMTP 用户名     |    一般是一个邮箱地址     |
+|  `SMTP_PASSWD`   |     SMTP 密码      |             -             |
+|   `SMTP_FROM`    |     发送者邮箱     | 一般来说应该和用户名一样  |
+|    `SMTP_TO`     |     接收者邮箱     |             -             |
+| `SMTP_REAL_NAME` |     发送者名字     |             -             |
+| `SMTP_START_TLS` | 启用 STARTTLS 协议 |   只能是 `on` 或 `off`    |
 
 对于白嫖 GitHub Actions 用户，配置环境变量的方法如 [Bark 推送](#bark-推送) 中的一样
 
+## 开发者功能
+
+在执行脚本时，设置环境变量 `SKLAND_DEBUG` 为非空值，可以让脚本打印测试信息，帮助你发现可能存在的问题
+
+**_注意：打印的测试信息中可能包含你账号的敏感信息，请注意保护_**

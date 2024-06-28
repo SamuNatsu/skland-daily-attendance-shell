@@ -31,6 +31,10 @@ _root_pid=$$
 # Debug 日志
 # (str)
 debug() {
+  if [ -z "$SKLAND_DEBUG" ]; then
+    return 0
+  fi
+
   local timestamp=$(date +"%Y-%m-%dT%H:%M:%S%z")
   local spid=$(printf %5d $$)
   echo "[$timestamp] [$spid] [DEBUG] $1" >/proc/$_root_pid/fd/1
@@ -78,6 +82,7 @@ generate_signature() {
   local str="$2$4$3$timestamp$header"
   local hmac_sha256=$(echo -n "$str" | openssl dgst -sha256 -hmac "$1" | awk '{print $2}')
   local sign=$(echo -n "$hmac_sha256" | md5sum | awk '{print $1}')
+  debug "[generate_signature] sign=$sign, header=$header"
 
   # 返回签名和 header
   echo "$sign"
@@ -128,6 +133,7 @@ notification_bark() {
       -d "$body" \
       "$1"
   )
+  debug "[notification_bark] body=$body, response=$response"
 
   # 检查 CURL 返回值
   if [ $? -ne 0 ]; then
@@ -135,8 +141,8 @@ notification_bark() {
     return 1
   fi
 
-  # 打印响应
-  debug "Bark 响应: json=$response"
+  # 打印信息
+  info 'Bark 推送成功'
 }
 
 # Server 酱推送 API
@@ -157,6 +163,7 @@ notification_server_chan() {
       -d "$body" \
       "https://sctapi.ftqq.com/$1.send"
   )
+  debug "[notification_server_chan] body=$body, response=$response"
 
   # 检查 CURL 返回值
   if [ $? -ne 0 ]; then
@@ -190,7 +197,7 @@ notification_smtp() {
 
   # 检查返回值
   if [ $exit_code -ne 0 ]; then
-    error "无法访问发送邮件: mail_exit=$exit_code, msg=$msg"
+    error "无法发送邮件: mail_exit=$exit_code, msg=$msg"
     return 1
   else
     info 'SMTP 推送成功'
@@ -246,6 +253,7 @@ hypergryph_auth() {
       -d "$body" \
       "$HYPERGRYPH_OAUTH_URL"
   )
+  debug "[hypergryph_auth] body=$body, response=$response"
 
   # 检查 CURL 返回值
   if [ $? -ne 0 ]; then
@@ -289,6 +297,7 @@ skland_auth() {
       -d "$body" \
       "$SKLAND_AUTH_URL"
   )
+  debug "[skland_auth] body=$body, response=$response"
 
   # 检查 CURL 返回值
   if [ $? -ne 0 ]; then
@@ -332,6 +341,7 @@ skland_get_binding() {
       -H "Cred: $1" \
       "$SKLAND_BINDING_URL"
   )
+  debug "[skland_get_binding] response=$response"
 
   # 检查 CURL 返回值
   if [ $? -ne 0 ]; then
@@ -381,6 +391,7 @@ skland_check_in() {
       -d "$body" \
       "$SKLAND_CHECKIN_URL"
   )
+  debug "[skland_check_in] body=$body, response=$response"
 
   # 检查 CURL 返回值
   if [ $? -ne 0 ]; then
@@ -441,6 +452,7 @@ skland_attendance() {
       -d "$body" \
       "$SKLAND_ATTENDANCE_URL"
   )
+  debug "[skland_attendance] body=$body, response=$response"
 
   # 检查 CURL 返回值
   if [ $? -ne 0 ]; then
@@ -468,6 +480,8 @@ skland_attendance() {
 # 进行签到
 # (token)
 do_attendance() {
+  debug "[do_attendance] token=$1"
+
   # 初始化推送
   notification_init
 
@@ -498,6 +512,7 @@ do_attendance() {
     notification_execute
     return 1
   fi
+  debug "[do_attendance] list=$list"
   info '角色绑定获取成功'
 
   # 森空岛检票
