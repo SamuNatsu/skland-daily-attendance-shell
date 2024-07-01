@@ -439,6 +439,7 @@ skland_attendance() {
   local response=$(
     curl \
       -s \
+      --compressed \
       -H 'User-Agent: Skland/1.5.1 (com.hypergryph.skland; build:100501001; Android 34; ) Okhttp/4.11.0' \
       -H 'Accept-Encoding: gzip' \
       -H 'Connection: close' \
