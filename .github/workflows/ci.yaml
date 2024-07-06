@@ -5,6 +5,7 @@ on:
 
 jobs:
   build:
+    if: github.repository == 'SamuNatsu/skland-daily-attendance-shell'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
