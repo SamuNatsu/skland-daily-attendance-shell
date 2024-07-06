@@ -28,8 +28,6 @@ Docker 镜像在 <https://hub.docker.com/r/snrainiar/skland-daily-attendance-she
 
 你需要根据 [直接使用](#直接使用) 中的步骤获得环境变量 `SKLAND_TOKEN` 的值，然后把它编写到 Docker 启动命令中启动镜像即可
 
-镜像中配置了计划任务，会在每天的 05:00（北京时间） 执行一次签到，因此你不需要手动重启镜像
-
 ```sh
 docker run \
   -d \
@@ -38,6 +36,9 @@ docker run \
   -e SKLAND_TOKEN=xxxx,yyyy,zzzz \
   snrainiar/skland-daily-attendance-shell
 ```
+
+> [!NOTE]
+> 镜像中配置了计划任务，会在每天的 05:00（北京时间） 执行一次签到，因此你不需要手动重启镜像
 
 ### 在 Docker compose 中使用
 
@@ -55,25 +56,25 @@ services:
 
 ### 白嫖 GitHub Actions 使用
 
-**强烈不推荐使用该方式，因为可能会触发 GitHub Actions 滥用检测导致仓库爆炸**
+> [!CAUTION]
+> 强烈 **不推荐** 使用该方式，因为可能会触发 GitHub Actions 滥用检测导致仓库爆炸
 
-1. Fork 一份仓库代码
-
+1. Fork 一份仓库代码  
    点击仓库右上角的 `Fork` 按钮将仓库 Fork 到自己的账号下
 
-2. 添加仓库 Secret
-
+2. 添加仓库 Secret  
    点击 `Settings` -> 点击选项卡 `Secrets and variables` -> 点击 `Actions` -> 点击 `New repository secret`
 
    建立名为 `SKLAND_TOKEN` 的 Secret，按照 [直接使用](#直接使用) 中的要求填写
 
-3. 启动 Action
+4. 启动 Action  
+   点击 `Actions` -> 点击左侧 `Schedule` -> 点击 `Run workflow` -> 点击按钮 `Run workflow`
 
    Action 默认为关闭状态，Fork 之后需要手动执行一次，若成功运行其才会激活
 
-   点击 `Actions` -> 点击左侧 `Schedule` -> 点击 `Run workflow` -> 点击按钮 `Run workflow`
-
-**_注意：如果仓库 60 天内没有活动，其计划 Actions 会被自动禁用，届时你需要手动重启一下（一般会发邮件通知你 Actions 禁用）_**
+> [!IMPORTANT]
+> 如果仓库 60 天内没有活动，其计划 Actions 会被 **自动禁用**，你需要手动进行处理  
+> 一般情况下你会收到 Github 发送的一封关于 Actions 将被禁用的通知邮件
 
 ## 通知推送功能
 
@@ -91,7 +92,8 @@ services:
 
 ### SMTP 推送
 
-**SMTP 推送强制要求使用 TLS 协议，并且要求进行登陆验证**
+> [!IMPORTANT]
+> SMTP 推送强制要求使用 TLS 协议，并且要求进行登陆验证
 
 你需要配置如下环境变量：
 
@@ -110,6 +112,7 @@ services:
 
 ## 开发者功能
 
-在执行脚本时，设置环境变量 `SKLAND_DEBUG` 为非空值，可以让脚本打印测试信息，帮助你发现可能存在的问题
+在执行脚本时，设置环境变量 `SKLAND_DEBUG` 为非空值，可以让脚本打印测试信息，帮助你发现可能存在的问题或告知开发者以进行漏洞修复
 
-**_注意：打印的测试信息中可能包含你账号的敏感信息，请注意保护_**
+> [!CAUTION]
+> 测试信息中可能包含你账号的敏感信息，请注意保护
