@@ -8,6 +8,7 @@
 
 - 脚本需要在 [Bash](https://www.gnu.org/software/bash) 环境下运行，Windows 用户请使用 [MSYS2](https://www.msys2.org)、[WSL2](https://learn.microsoft.com/zh-cn/windows/wsl/install) 或虚拟机等拥有 Bash 的环境运行
 - 脚本需要使用 [curl](https://curl.se)、[OpenSSL](https://www.openssl.org) 和 [jq](https://jqlang.github.io/jq) 这三个第三方软件包
+- 如果需要使用 SMTP 消息推送功能，请确保系统中可以使用 [mailx](https://linux.die.net/man/1/mailx) 命令发送邮件
 
 ## 使用方法
 
@@ -93,7 +94,7 @@ services:
 ### SMTP 推送
 
 > [!IMPORTANT]
-> SMTP 推送强制要求使用 TLS 协议，并且要求进行登陆验证
+> SMTP 推送强制要求使用 **TLS 协议**，并且要求进行 **登陆验证**
 
 你需要配置如下环境变量：
 
