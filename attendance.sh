@@ -10,6 +10,8 @@ SKLAND_BINDING_URL='https://zonai.skland.com/api/v1/game/player/binding'
 SKLAND_CHECKIN_URL='https://zonai.skland.com/api/v1/score/checkin'
 SKLAND_ATTENDANCE_URL='https://zonai.skland.com/api/v1/game/attendance'
 
+SKLAND_USER_AGENT='User-Agent: Skland/1.21.0 (com.hypergryph.skland; build:102100065; Android 34; ) Okhttp/4.11.0'
+
 declare -A SKLAND_BOARD_MAP
 SKLAND_BOARD_MAP[1]='明日方舟'
 SKLAND_BOARD_MAP[2]='来自星辰'
@@ -67,7 +69,7 @@ generate_signature() {
   local platform='1'
   local timestamp=$(($(date +%s) - 2))
   local d_id=''
-  local v_name='1.5.1'
+  local v_name='1.21.0'
   local header=$(
     jq \
       -cnM \
@@ -129,7 +131,7 @@ notification_bark() {
   local response=$(
     curl \
       -s \
-      -H 'Content-Type: application/json; charset=utf-8' \
+      -H 'Content-Type: application/json' \
       -d "$body" \
       "$1"
   )
@@ -159,7 +161,7 @@ notification_server_chan() {
   local response=$(
     curl \
       -s \
-      -H 'Content-Type: application/json; charset=utf-8' \
+      -H 'Content-Type: application/json' \
       -d "$body" \
       "https://sctapi.ftqq.com/$1.send"
   )
@@ -246,10 +248,10 @@ hypergryph_auth() {
   local response=$(
     curl \
       -s \
-      -H 'User-Agent: Skland/1.5.1 (com.hypergryph.skland; build:100501001; Android 34; ) Okhttp/4.11.0' \
+      -H "$SKLAND_USER_AGENT" \
       -H 'Accept-Encoding: gzip' \
       -H 'Connection: close' \
-      -H 'Content-Type: application/json; charset=utf-8' \
+      -H 'Content-Type: application/json' \
       -d "$body" \
       "$HYPERGRYPH_OAUTH_URL"
   )
@@ -290,10 +292,10 @@ skland_auth() {
   local response=$(
     curl \
       -s \
-      -H 'User-Agent: Skland/1.5.1 (com.hypergryph.skland; build:100501001; Android 34; ) Okhttp/4.11.0' \
+      -H "$SKLAND_USER_AGENT" \
       -H 'Accept-Encoding: gzip' \
       -H 'Connection: close' \
-      -H 'Content-Type: application/json; charset=utf-8' \
+      -H 'Content-Type: application/json' \
       -d "$body" \
       "$SKLAND_AUTH_URL"
   )
@@ -329,10 +331,10 @@ skland_get_binding() {
   local response=$(
     curl \
       -s \
-      -H 'User-Agent: Skland/1.5.1 (com.hypergryph.skland; build:100501001; Android 34; ) Okhttp/4.11.0' \
+      -H "$SKLAND_USER_AGENT" \
       -H 'Accept-Encoding: gzip' \
       -H 'Connection: close' \
-      -H 'Content-Type: application/json; charset=utf-8' \
+      -H 'Content-Type: application/json' \
       -H "Platform: $(jq -r '.platform' <<< "$header")" \
       -H "Timestamp: $(jq -r '.timestamp' <<< "$header")" \
       -H "Did: $(jq -r '.dId' <<< "$header")" \
@@ -378,10 +380,10 @@ skland_check_in() {
   local response=$(
     curl \
       -s \
-      -H 'User-Agent: Skland/1.5.1 (com.hypergryph.skland; build:100501001; Android 34; ) Okhttp/4.11.0' \
+      -H "$SKLAND_USER_AGENT" \
       -H 'Accept-Encoding: gzip' \
       -H 'Connection: close' \
-      -H 'Content-Type: application/json; charset=utf-8' \
+      -H 'Content-Type: application/json' \
       -H "Platform: $(jq -r '.platform' <<< "$header")" \
       -H "Timestamp: $(jq -r '.timestamp' <<< "$header")" \
       -H "Did: $(jq -r '.dId' <<< "$header")" \
@@ -440,10 +442,10 @@ skland_attendance() {
     curl \
       -s \
       --compressed \
-      -H 'User-Agent: Skland/1.5.1 (com.hypergryph.skland; build:100501001; Android 34; ) Okhttp/4.11.0' \
+      -H "$SKLAND_USER_AGENT" \
       -H 'Accept-Encoding: gzip' \
       -H 'Connection: close' \
-      -H 'Content-Type: application/json; charset=utf-8' \
+      -H 'Content-Type: application/json' \
       -H "Platform: $(jq -r '.platform' <<< "$header")" \
       -H "Timestamp: $(jq -r '.timestamp' <<< "$header")" \
       -H "Did: $(jq -r '.dId' <<< "$header")" \
