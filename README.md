@@ -1,5 +1,9 @@
 # 森空岛签到
 
+> [!CAUTION]
+> 目前鹰角把森空岛检票的 API 加了风控拦截，现没有任何手段可以规避  
+> 因此该脚本目前只能实现森空岛签到，敬请谅解
+
 纯 Shell 实现的森空岛各版面登岛检票和明日方舟每日签到任务
 
 主要逻辑代码移植自 [skland-daily-attendance](https://github.com/enpitsuLin/skland-daily-attendance)
